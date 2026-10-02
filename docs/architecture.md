@@ -47,7 +47,7 @@ User picks a CSV
                        or apply the user's column choice if provided
        normalization:  parse timestamps and temperature values, sort,
                        count invalid rows, rejected rows, in-file duplicates/conflicts
-  ← preview: column detection result (confident / candidates), counts,
+  ← preview: column detection result (confident / matching columns), counts,
              first/last timestamp, sample rows
 ```
 
@@ -84,12 +84,12 @@ Analysis loads the fridge's **full stored history** (all imports and loggers ass
 
 | Module | Owns | Does NOT own |
 |---|---|---|
-| **`domain/`** | Shared domain types (`ParsedRow`, `NormalizedReading`, `Excursion`, `Gap`, `Spike`, …) and the name-key helper (trim, collapse whitespace, lower-case). | Any I/O or rules beyond name keys. |
+| **`domain/`** | The name-key helper (trim, collapse whitespace, lower-case). Types live in the module that produces them (`parsing/`, `normalization/`, `analysis/`, …). | Any I/O or rules beyond name keys. |
 | **`parsing/`** | CSV text → header + string cells (via PapaParse). Column detection by alias. Applying a user-selected column mapping. Reporting "not confident". | Interpreting values (dates, numbers, units). Database. HTTP. Outputs strings only. |
 | **`normalization/`** | Timestamp parsing for the supported formats (A3) into canonical local time. Temperature parsing (`ERR`/empty/non-numeric → invalid with reason, A12). °F → °C conversion (A9). Chronological sort (A13). In-file duplicate/conflict detection. Keeps raw text alongside every normalised value (A11). | Database. Fridges/loggers. Analysis rules. HTTP. Pure functions only. |
 | **`imports/`** | Orchestrates preview and import: parse → normalise → persist. Find-or-create fridge. Duplicate/conflict detection against stored readings. Transaction boundary. Import summary. | CSV details, temperature rules, SQL text (uses repositories), HTTP. |
 | **`analysis/`** | Pure functions from one fridge's chronologically sorted readings to gaps, above-threshold runs, isolated spikes, excursions, warming findings and status. All thresholds/parameters are named constants in one place. No clock: any "now" or time window is an explicit argument. | Database, parsing, units (only ever sees °C), HTTP, React, Express. |
-| **`persistence/`** | Schema (`schema.sql`, applied at startup with `CREATE TABLE IF NOT EXISTS`), database connection, repositories with plain SQL, transactions. Enforces the unique key. | Business rules. |
+| **`persistence/`** | Schema (`schema.ts`, applied at startup with `CREATE TABLE IF NOT EXISTS`), database connection, repositories with plain SQL, transactions. Enforces the unique key. | Business rules. |
 | **`api/`** | Express app factory, routes, minimal manual request-shape checks (`utils/validation.ts`), mapping domain errors to HTTP status codes, response shaping, serving the built client app. | Business logic — handlers are thin and delegate to services. |
 
 The Express app is created by a factory (`createApp(db)`) so integration tests can run it against an in-memory database.
@@ -109,9 +109,9 @@ Three pages, mobile-first, plain CSS, no state-management library (each page fet
    3. *Result* — import summary (including duplicates and conflicts) and a link to the fridge.
 
 3. **Fridge detail — `/fridges/:id`**
-   Status header; temperature chart with the 5 °C reference line, excursions shaded, spikes marked and gaps shown as breaks in the line; the **"Above 5 °C" list** (start, end, duration, peak, flags such as *ongoing* and *contains missing data*) that answers the inspector's question; gaps and spikes lists; a collapsible readings table showing raw text, °C value, logger and import for traceability.
+   Status header with the file the status is based on; temperature chart with the 5 °C reference line, excursions shaded, and line breaks at invalid readings, gaps and between uploaded files; one card per uploaded file (filename, logger, unit, upload time) listing that file's findings — **"Above 5 °C"** (start, end or *still above at the end of this file*, duration, peak, *missing data* note) answering the inspector's question, warming, data gaps and single high readings (spikes, explicitly not treated as a problem); a collapsible list of all readings (time, °C, raw °F value for converted files, raw text of invalid readings).
 
-Shared components: `StatusBadge`, `TemperatureChart`, `EventList`.
+Shared components: `StatusBadge`, `TemperatureChart`.
 
 The client app keeps its own `types.ts` for API responses rather than a shared package; API response shapes are pinned by the backend integration tests.
 
@@ -134,7 +134,7 @@ fridges
 imports                               -- one row per confirmed upload
   id                  INTEGER PRIMARY KEY
   fridge_id           INTEGER NOT NULL REFERENCES fridges(id)  -- assignment at import time
-  logger_id           TEXT NOT NULL
+  logger_id           TEXT NOT NULL     -- normalized: trimmed, upper-case
   unit                TEXT NOT NULL CHECK (unit IN ('C','F'))
   filename            TEXT NOT NULL
   timestamp_column    TEXT NOT NULL
@@ -180,7 +180,7 @@ readings                              -- one row per stored data row
 
 ### 5.3 Duplicate identity and re-uploads
 
-**MVP assumption:** *We assume one physical logger produces at most one reading for a given timestamp.* Therefore a reading is identified by `UNIQUE (logger_id, recorded_at)`.
+**MVP assumption:** *We assume one physical logger produces at most one reading for a given timestamp.* Therefore a reading is identified by `UNIQUE (logger_id, recorded_at)`. Logger IDs are normalized (trim + upper-case) before storage and before these checks, so `tl-0512` and `TL-0512` are the same logger.
 
 | Incoming row vs stored / earlier row with same logger + timestamp | Outcome |
 |---|---|
@@ -299,12 +299,13 @@ npm workspaces with two packages.
 ├─ package.json                 workspaces + root scripts (dev, build, start, test, seed)
 ├─ docs/
 │  ├─ requirements.md
-│  └─ architecture.md
+│  ├─ architecture.md
+│  └─ implementation-plan.md
 ├─ sample-data/                 raw logger CSVs covering the assignment scenarios
 ├─ server/
 │  ├─ package.json  tsconfig.json
 │  ├─ src/
-│  │  ├─ domain/                types, name-key helper
+│  │  ├─ domain/                name-key helper
 │  │  ├─ parsing/
 │  │  ├─ normalization/
 │  │  ├─ analysis/              rules.ts (constants), analyze.ts
@@ -318,15 +319,14 @@ npm workspaces with two packages.
 │  │  └─ seed.ts                imports sample-data through the import service
 │  └─ test/
 │     ├─ unit/
-│     ├─ integration/
-│     └─ fixtures/
+│     └─ integration/
 └─ client/
    ├─ package.json  tsconfig.json  vite.config.ts  index.html
    └─ src/
       ├─ main.tsx
       ├─ api.ts  types.ts
       ├─ pages/                 Overview, Upload, FridgeDetail
-      └─ components/            StatusBadge, TemperatureChart, EventList
+      └─ components/            StatusBadge, TemperatureChart
 ```
 
 Reviewer workflow (to be detailed in `README.md`): `npm install` → optionally `npm run seed` → `npm run build && npm start` → open `http://localhost:3000`. `npm run dev` runs server and client with hot reload for development.
@@ -390,7 +390,7 @@ Reviewer workflow (to be detailed in `README.md`): `npm install` → optionally 
 Resolved before Phase 5 (details and reasons in `requirements.md` A17, A21, A22):
 
 1. **D1 — Gaps within a single import only.** No gap is inferred between separate imports.
-2. **D2 — Gradual warming:** at least 3 consecutive increases (≥ 4 valid readings) with a total rise of at least 1.0 °C; need not cross 5 °C; a gap ends the sequence. Its own pure function in `analysis/`, parameters as named constants. MVP assumption to validate with Summer.
+2. **D2 — Gradual warming:** at least 3 consecutive increases (≥ 4 valid readings) with a total rise of at least 1.0 °C; need not cross 5 °C; a gap, an invalid reading or an isolated spike ends the sequence. Its own pure function in `analysis/`, parameters as named constants. MVP assumption to validate with Summer.
 3. **D3 — Overview status is based on the fridge's latest import.** History stays visible in the detail view.
 
 Also decided before Phase 5 (`requirements.md` §2.7):

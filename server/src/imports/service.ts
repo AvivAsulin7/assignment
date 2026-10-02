@@ -116,7 +116,8 @@ export interface ImportSummary {
  * insert the import record → insert new readings. Any failure stores nothing.
  */
 export function importUpload(db: Db, input: ImportInput, now = new Date().toISOString()): ImportSummary {
-  const loggerId = input.loggerId.trim();
+  // A logger ID names a physical device: "tl-0512" and "TL-0512" are the same logger (A14).
+  const loggerId = input.loggerId.trim().toUpperCase();
   const branch = input.branch.trim();
   const fridge = input.fridge.trim();
   if (!loggerId || !branch || !fridge) {

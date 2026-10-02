@@ -58,6 +58,19 @@ describe('POST /api/uploads/preview', () => {
     expect(chosen.body.counts).toMatchObject({ valid: 1 });
   });
 
+  it('treats the first row of a header-less file as column names (what the preview warning explains)', async () => {
+    const res = await request(app)
+      .post('/api/uploads/preview')
+      .send({ filename: 'no-header.csv', content: '2026-09-14 06:00,3.8\n2026-09-14 06:15,3.9\n2026-09-14 06:30,4.0\n' });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      headers: ['2026-09-14 06:00', '3.8'],
+      detection: { confident: false, timestamp: null, temperature: null },
+      columns: null,
+      rowCount: 2, // the first line is not counted as a data row
+    });
+  });
+
   it('writes nothing to the database', async () => {
     await request(app).post('/api/uploads/preview').send({ filename: 'a.csv', content: CSV });
     expect(count('fridges') + count('imports') + count('readings')).toBe(0);

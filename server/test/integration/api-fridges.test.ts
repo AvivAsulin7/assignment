@@ -17,6 +17,7 @@ const SAMPLES = [
   { file: 'haifa-dairy-TL-0231.csv', loggerId: 'TL-0231', branch: 'Haifa', fridge: 'Dairy', unit: 'F' },
   { file: 'rishon-lezion-cream-cakes-TL-0388.csv', loggerId: 'TL-0388', branch: 'Rishon LeZion', fridge: 'Cream cakes', unit: 'C', columns: { timestamp: 1, temperature: 2 } },
   { file: 'tel-aviv-display-2-TL-0417.csv', loggerId: 'TL-0417', branch: 'tel aviv', fridge: 'Display 2', unit: 'C' },
+  { file: 'jerusalem-display-TL-0520.csv', loggerId: 'TL-0520', branch: 'Jerusalem', fridge: 'Display', unit: 'C' },
 ] as const;
 
 let db: Db;
@@ -62,6 +63,7 @@ describe('GET /api/fridges', () => {
     expect(res.body.map((f: { branch: string; name: string }) => `${f.branch} / ${f.name}`)).toEqual([
       'Haifa / Dairy',
       'Jerusalem / Dairy',
+      'Jerusalem / Display',
       'Rishon LeZion / Cream cakes',
       'Tel Aviv / Display 2', // typed as "tel aviv", shown with the branch's first spelling
       'Tel Aviv / Walk-in',
@@ -76,9 +78,10 @@ describe('GET /api/fridges', () => {
     expect(status).toEqual({
       'Haifa / Dairy': 'ok',
       'Jerusalem / Dairy': 'gaps',
+      'Jerusalem / Display': 'excursion', // recovered within the file — still an excursion (O1)
       'Rishon LeZion / Cream cakes': 'excursion',
       'Tel Aviv / Display 2': 'ok',
-      'Tel Aviv / Walk-in': 'ok', // isolated spike only
+      'Tel Aviv / Walk-in': 'ok', // isolated spike only — not an excursion, not warming
     });
   });
 
@@ -90,7 +93,7 @@ describe('GET /api/fridges', () => {
       branch: 'Haifa',
       name: 'Dairy',
       status: 'ok',
-      latestReading: { recordedAt: '2026-09-14 06:45:00', temperatureC: 3.78 },
+      latestReading: { recordedAt: '2026-09-14 23:45:00', temperatureC: 3.78 },
     });
   });
 
@@ -124,7 +127,7 @@ describe('GET /api/fridges/:id', () => {
       loggerId: 'TL-0417',
       filename: 'tel-aviv-walk-in-TL-0417.csv',
       unit: 'C',
-      counts: { rows: 5, inserted: 5, invalid: 0, rejected: 0, duplicates: 0, conflicts: 0 },
+      counts: { rows: 96, inserted: 96, invalid: 0, rejected: 0, duplicates: 0, conflicts: 0 },
     });
     expect(res.body.statusImportId).toBe(res.body.imports[0].id);
   });
@@ -134,30 +137,45 @@ describe('GET /api/fridges/:id', () => {
     const analysis = res.body.imports[0].analysis;
     expect(analysis.spikes).toMatchObject([{ at: '2026-09-14 06:15:00', temperatureC: 9.4 }]);
     expect(analysis.excursions).toEqual([]);
-    expect(res.body.readings.map((r: { recordedAt: string }) => r.recordedAt)).toEqual([
+    expect(analysis.warming).toEqual([]); // the spike does not count as warming
+    const times = res.body.readings.map((r: { recordedAt: string }) => r.recordedAt);
+    expect(times).toHaveLength(96);
+    expect(times).toEqual([...times].sort()); // 05:45, listed after 06:30 in the file, is back in order
+    expect(times.slice(times.indexOf('2026-09-14 05:45:00'), times.indexOf('2026-09-14 05:45:00') + 2)).toEqual([
       '2026-09-14 05:45:00',
       '2026-09-14 06:00:00',
-      '2026-09-14 06:15:00',
-      '2026-09-14 06:30:00',
-      '2026-09-14 06:45:00',
     ]);
+    expect(times.every((t: string) => t.startsWith('2026-09-14'))).toBe(true); // none of Display 2's (17/09)
   });
 
   it('shows Rishon\'s ongoing excursion and warming', async () => {
     const res = await request(app).get(`/api/fridges/${await fridgeId('Rishon LeZion', 'Cream cakes')}`);
     expect(res.body.status).toBe('excursion');
     const analysis = res.body.imports[0].analysis;
-    expect(analysis.excursions).toMatchObject([{ startAt: '2026-09-14 06:15:00', endAt: null, ongoing: true, peakC: 7.1 }]);
-    expect(analysis.warming).toMatchObject([{ fromC: 4.6, toC: 7.1, riseC: 2.5 }]);
+    // Assignment rows 4.6 → 5.4 → 6.3 → 7.1 inside a longer rise; still above 5 °C at the end of the file.
+    expect(analysis.excursions).toMatchObject([
+      { startAt: '2026-09-14 06:15:00', endAt: null, ongoing: true, minutes: 165, peakC: 8.4 },
+    ]);
+    expect(analysis.warming).toMatchObject([
+      { startAt: '2026-09-14 05:45:00', endAt: '2026-09-14 08:00:00', fromC: 4.5, toC: 8.2, riseC: 3.7 },
+    ]);
+  });
+
+  it('shows the recovered excursion in Jerusalem / Display', async () => {
+    const res = await request(app).get(`/api/fridges/${await fridgeId('Jerusalem', 'Display')}`);
+    expect(res.body.status).toBe('excursion');
+    expect(res.body.imports[0].analysis.excursions).toMatchObject([
+      { startAt: '2026-09-14 13:45:00', endAt: '2026-09-14 15:15:00', minutes: 90, ongoing: false, peakC: 6.8 },
+    ]);
   });
 
   it('returns raw and normalized values for every reading (Haifa °F + ERR)', async () => {
     const res = await request(app).get(`/api/fridges/${await fridgeId('Haifa', 'Dairy')}`);
-    expect(res.body.readings[0]).toMatchObject({
-      sourceLine: 2, loggerId: 'TL-0231', rawTimestamp: '14/09/2026 06:00', rawTemperature: '38.3',
-      recordedAt: '2026-09-14 06:00:00', temperatureC: 3.5, invalidReason: null,
+    const at = (t: string) => res.body.readings.find((r: { recordedAt: string }) => r.recordedAt === t);
+    expect(at('2026-09-14 06:00:00')).toMatchObject({
+      loggerId: 'TL-0231', rawTimestamp: '14/09/2026 06:00', rawTemperature: '38.3', temperatureC: 3.5, invalidReason: null,
     });
-    expect(res.body.readings[2]).toMatchObject({ rawTemperature: 'ERR', temperatureC: null, invalidReason: 'non-numeric value: ERR' });
+    expect(at('2026-09-14 06:30:00')).toMatchObject({ rawTemperature: 'ERR', temperatureC: null, invalidReason: 'non-numeric value: ERR' });
   });
 
   it('keeps import boundaries: each import has its own findings and no gap is created between them', async () => {
@@ -181,7 +199,8 @@ describe('GET /api/fridges/:id', () => {
     upload({ content: fs.readFileSync(path.join(sampleDir, SAMPLES[0].file), 'utf8') });
     const res = await request(app).get(`/api/fridges/${id}`);
     expect(res.body.imports).toHaveLength(2);
-    expect(res.body.imports[1]).toMatchObject({ counts: { inserted: 0, duplicates: 5 }, analysis: null });
+    // 89 rows: 88 already stored + 1 repeated row inside the file.
+    expect(res.body.imports[1]).toMatchObject({ counts: { rows: 89, inserted: 0, duplicates: 89 }, analysis: null });
     expect(res.body.status).toBe('gaps'); // unchanged by the duplicate-only upload (O2)
   });
 

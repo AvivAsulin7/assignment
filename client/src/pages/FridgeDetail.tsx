@@ -147,8 +147,10 @@ function Findings({ a }: { a: ImportAnalysis }) {
       {a.excursions.map((e) => (
         <li key={`e-${e.startAt}`} className="finding status-excursion">
           <strong>Above 5 °C</strong>{' '}
-          {e.ongoing || e.endAt === null
-            ? `from ${time(e.startAt)}, still above 5 °C at the end of this file (at least ${duration(e.minutes)}).`
+          {e.endAt === null
+            ? e.minutes > 0
+              ? `from ${time(e.startAt)}, still above 5 °C at the end of this file (at least ${duration(e.minutes)}).`
+              : `at ${time(e.startAt)}, the last reading in this file — how long it lasted is not known yet.`
             : `from ${time(e.startAt)} to ${time(e.endAt)} (${duration(e.minutes)}).`}{' '}
           Highest: {e.peakC} °C.
           {e.containsMissingData && (

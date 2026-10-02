@@ -51,6 +51,7 @@ Each item is a call we made where the email is silent or ambiguous.
 ### 2.1 Input files
 - **A1. Raw logger file format.** A raw logger file is a CSV with two meaningful columns: a timestamp and a temperature. It does **not** contain Logger ID, Branch or Fridge. The sample table in the assignment is Summer's *combined spreadsheet*, not a logger file. We generate our own sample raw files for development and demos.
 - **A2. Column identification.** The system first tries known case-insensitive header aliases for the timestamp and temperature columns (e.g. `time`, `timestamp`, `date`, `datetime` / `temp`, `temperature`, optionally with a unit suffix). If the columns cannot be identified confidently, the user selects the timestamp and temperature columns in the upload preview. No content-based automatic column inference in the MVP. Extra columns are ignored.
+  - The first non-blank row is always treated as the header row. **Header-less files are not supported in the MVP:** when the headers cannot be identified, the preview warns that the first row is being used as column names and that, if it is actually a reading, it will not be imported (Phase 10 decision; to confirm with Summer, §5).
 - **A3. Timestamp formats.** Supported: `YYYY-MM-DD HH:MM[:SS]` (space or `T` separator) and `DD/MM/YYYY HH:MM[:SS]`. Slash dates are always interpreted as **day/month** (Israeli convention, consistent with Haifa's `14/09/2026`). Rows whose timestamp cannot be parsed are rejected and reported.
 - **A4. Time zone.** Timestamps are treated as local branch time (Israel) and stored as-is, without time-zone conversion. DST transitions are a known limitation.
 
@@ -71,7 +72,8 @@ Each item is a call we made where the email is silent or ambiguous.
 - **A14. Duplicates.** Behavioural requirement:
   - Duplicate readings within a file or across uploads are stored once; they are counted and reported in the preview/import summary. Re-uploading the same data must be safe.
   - A reading that duplicates an existing one but with a **different** value is treated as a conflict and reported to the user, not silently merged or overwritten.
-  - *The exact uniqueness strategy (what identifies "the same reading") is a data-model decision to be finalised during data-model design, since loggers can move between fridges.*
+  - Identity: one physical logger produces at most one reading per timestamp — `UNIQUE (logger_id, recorded_at)` (architecture §5.3).
+  - **Logger IDs are normalized with trim + upper-case** before they are stored and before duplicate/conflict checks: a logger ID names a physical device, so `TL-0512` and ` tl-0512 ` are the same logger (Phase 10 decision).
 
 ### 2.5 Analysis rules
 Analysis covers a fridge's full stored history, in Celsius, but each import is analysed independently: no rule looks across an import boundary (O3, §2.7).
@@ -92,7 +94,7 @@ Analysis covers a fridge's full stored history, in Celsius, but each import is a
 - **A21. Gradual warming.** Included in the MVP. Constraints: simple, deterministic, explainable in one sentence, based only on stored readings, parameters as named constants, no AI/ML. It must distinguish a sustained rise (like Rishon's 4.6 → 5.4 → 6.3 → 7.1) from a single jump.
   - **Decision D2 — rule:** a fridge is *warming* when it has **at least 3 consecutive temperature increases** (therefore at least **4 valid readings**) and the **total increase from the first to the last of those readings is at least 1.0 °C**.
   - The sequence does not need to cross 5 °C.
-  - A data gap (A17) or an invalid reading (O4) ends the sequence; sequences never cross imports (O3).
+  - A data gap (A17), an invalid reading (O4) or an isolated spike (A19) ends the sequence; sequences never cross imports (O3). *Spike refinement (Phase 10): realistic sample data showed a door-opening jump after two small natural rises (3.9 → 4.0 → 4.1 → 9.4) satisfying the numeric rule; a one-reading jump is not a trend, so a spike reading cannot be part of a warming sequence.*
   - *Reason:* the assignment distinguishes a one-reading jump from a slowly warming fridge but gives no numbers. The 3 increases / 1.0 °C values are an **MVP assumption to validate with Summer before production** (see §5).
 
 ### 2.6 Presentation
@@ -120,7 +122,7 @@ Analysis covers a fridge's full stored history, in Celsius, but each import is a
 5. **Fridge assignment preserved per import** so logger moves don't rewrite history (A7).
 6. **Analysis:** gap detection, > 5 °C excursions with start/end/duration, isolated-spike classification, gradual-warming detection (A15–A21).
 7. **Fridge overview:** all fridges grouped by branch, with status and problems surfaced first (A22).
-8. **Fridge detail/history:** temperature chart with the 5 °C line, excursions, spikes and gaps marked; a list of excursions answering "when above 5 °C, and for how long" (C2).
+8. **Fridge detail/history:** temperature chart with the 5 °C line, excursions shaded and line breaks where data is missing or invalid; findings per uploaded file — excursions answering "when above 5 °C, and for how long" (C2), warming, gaps and spikes; all readings with raw values.
 9. **Mobile-friendly UI** (A23).
 10. **Local persistence** — no accounts, no paid services (A24).
 11. **Tests** covering parsing, normalisation and analysis rules, using sample-data scenarios derived from the assignment (Haifa °F + `ERR`, Tel Aviv spike, Rishon slow warming, Jerusalem duplicate + gap, TL-0417 move).
@@ -161,3 +163,4 @@ Analysis covers a fridge's full stored history, in Celsius, but each import is a
 11. Is there anyone else (branch managers) who should see this, or just you?
 12. Our "warming" rule flags at least 3 consecutive increases totalling at least 1.0 °C (D2). Does that match what you would call "slowly warming up"? What does a normal day look like for these fridges (defrost cycles, busy hours)?
 13. Does each weekly file contain everything since the previous download, or can there be periods that are never uploaded?
+14. Do the logger files always start with a header row (e.g. `Time,Temp`)? Header-less files are not supported in the MVP.

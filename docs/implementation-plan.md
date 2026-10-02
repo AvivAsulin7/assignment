@@ -26,7 +26,7 @@ At each checkpoint: Claude presents options with trade-offs → user decides →
 | Skill | Created | Purpose |
 |---|---|---|
 | ~~**temperature-analysis**~~ | **Intentionally not created** | Was planned to encode the analysis rules for implementing and reviewing analysis code. Skipped: the rules are already captured in `requirements.md`, `architecture.md` and `NOTES.md`; the implementation is small and pure; and it is covered by focused tests. Adding a Skill after implementation would add process overhead without meaningful value in this time-boxed take-home. |
-| **assignment-review** | Start of Phase 10 | Checks the repo against the assignment's deliverables and our docs: README clone-to-run, NOTES.md required topics, MVP scope coverage, out-of-scope creep, unresolved/TBD items, test status. |
+| ~~**assignment-review**~~ | **Intentionally not created** | Was planned to check the repo against the assignment and our docs. Skipped: by Phase 10 the implementation was complete, and Phase 10 itself performed the independent assignment/specification review, full tests, database checks and end-to-end verification. A Skill created afterwards would add process overhead without improving the review. |
 
 ---
 
@@ -49,7 +49,7 @@ At each checkpoint: Claude presents options with trade-offs → user decides →
 
 - **Goal:** Turn raw CSV text into a header + string rows and identify the timestamp/temperature columns (A1, A2).
 - **Implement:** `parsing/` module using PapaParse: header/rows extraction, case-insensitive alias detection for timestamp and temperature columns, a "not confident" result with candidate columns, applying a user-selected column mapping. Outputs strings only.
-- **Main files:** `server/src/parsing/*`, `server/test/unit/parsing.test.ts`, `server/test/fixtures/*.csv`.
+- **Main files (as built):** `server/src/parsing/{csv.ts,columns.ts,index.ts}`, `server/test/unit/parsing.test.ts` (inline CSV strings instead of fixture files, to keep exact BOM/CRLF bytes).
 - **Tests:** Columns in either order; alias and case variants; extra columns ignored; no recognisable header → not confident; user mapping applied; BOM; CRLF; quoted values; empty file; header-only file.
 - **Done when:** All parsing tests pass; module has no imports from normalisation, persistence or API.
 - **Depends on:** Phase 1.
@@ -59,7 +59,7 @@ At each checkpoint: Claude presents options with trade-offs → user decides →
 
 - **Goal:** Turn parsed rows into normalised readings while preserving raw values (A3, A9–A14).
 - **Implement:** `normalization/` module: timestamp parsing (`YYYY-MM-DD[ T]HH:MM[:SS]`, `DD/MM/YYYY HH:MM[:SS]`, slash always DD/MM, invalid calendar dates rejected); temperature parsing (`ERR`/empty/non-numeric → invalid with reason); °F → °C by the user-selected unit; chronological sort; in-file duplicate vs conflict detection; raw text kept alongside every normalised value; counts for preview/summary.
-- **Main files:** `server/src/normalization/*`, `server/src/domain/types.ts`, `server/test/unit/normalization.test.ts`.
+- **Main files (as built):** `server/src/normalization/readings.ts`, `server/test/unit/normalization.test.ts`.
 - **Tests:** Both formats; `31/02/2026` rejected; `05/09/2026` read as 5 September; 38.3 °F → 3.5 °C and 39.0 °F → 3.9 °C; `ERR` → invalid, not 0; out-of-order rows sorted (TL-0417 05:45); exact duplicate (Jerusalem 06:15 3.9) vs same timestamp with different value.
 - **Done when:** All tests pass; parsing → normalisation pipeline works on the assignment scenarios as pure functions.
 - **Depends on:** Phases 1–2.
@@ -68,8 +68,8 @@ At each checkpoint: Claude presents options with trade-offs → user decides →
 ## Phase 4 — Persistence and import flow
 
 - **Goal:** Store imports and readings with preserved fridge assignment and safe re-uploads (A5, A7, A8, A11, A12, A14; architecture §5).
-- **Implement:** `schema.sql` (fridges, imports, readings, `UNIQUE(logger_id, recorded_at)`) applied at startup; repositories; `imports/` service with `preview(input)` (no writes) and `import(input)` (one transaction: find-or-create fridge by name keys → insert import with raw content → insert readings, skipping duplicates and recording conflicts against stored data); import summary. Sample raw logger CSVs in `sample-data/` covering the assignment scenarios, and `scripts/seed.ts` that imports them through the service.
-- **Main files:** `server/src/persistence/{schema.sql,db.ts,repositories/*}`, `server/src/imports/*`, `server/scripts/seed.ts`, `sample-data/*.csv`, `server/test/integration/imports.test.ts`.
+- **Implement:** `schema.ts` (fridges, imports, readings, `UNIQUE(logger_id, recorded_at)`) applied at startup; repositories; `imports/` service with `preview(input)` (no writes) and `import(input)` (one transaction: find-or-create fridge by name keys → insert import with raw content → insert readings, skipping duplicates and recording conflicts against stored data); import summary. Sample raw logger CSVs in `sample-data/` covering the assignment scenarios, and `scripts/seed.ts` that imports them through the service.
+- **Main files (as built):** `server/src/persistence/{schema.ts,db.ts,repository.ts}`, `server/src/imports/*`, `server/scripts/seed.ts`, `sample-data/*.csv`, `server/test/integration/imports.test.ts`.
 - **Tests (service-level, in-memory SQLite):** preview writes nothing; import stores readings + correct counts; re-upload of the same file → 0 inserted, all duplicates; conflicting value → reported, stored value unchanged; TL-0417 Walk-in then Display 2 → earlier readings stay with Walk-in; `tel aviv` resolves to the existing Tel Aviv fridge; Haifa °F file with `ERR` → stored in °C with one invalid reading; rejected-timestamp rows counted and not inserted; failed import leaves nothing behind (transaction).
 - **Done when:** Tests pass; `npm run seed` populates a database from `sample-data/`.
 - **Depends on:** Phases 1–3.
@@ -79,7 +79,7 @@ At each checkpoint: Claude presents options with trade-offs → user decides →
 
 - **Goal:** Expose preview and import over HTTP.
 - **Implement:** `POST /api/uploads/preview` and `POST /api/imports` with minimal manual request-shape checks (Zod was removed), thin handlers delegating to the import service, 400 on validation errors, JSON body-size limit.
-- **Main files:** `server/src/api/{routes/uploads.ts,routes/imports.ts,schemas.ts,app.ts}`, `server/test/integration/api-uploads.test.ts`.
+- **Main files (as built):** `server/src/api/{uploads.ts,app.ts}`, `server/src/utils/validation.ts`, `server/test/integration/api-uploads.test.ts`.
 - **Tests (Supertest):** preview returns detection/counts; preview with explicit `columns`; import returns summary; invalid body → 400; re-upload via API → duplicates.
 - **Done when:** Tests pass; endpoints callable from the dev frontend.
 - **Depends on:** Phase 4.
@@ -104,7 +104,7 @@ At each checkpoint: Claude presents options with trade-offs → user decides →
 - **5.3 — Spikes and excursions:** isolated spike classification (A19); excursions with start / end (first valid reading ≤ 5.0 °C) / duration / peak / *ongoing* / *contains missing data* (A20). Excursions never span imports (O3).
 - **5.4 — Warming:** implement the D2 rule test-first (A21); gaps and invalid readings break a sequence (O4), sequences never cross imports (O3).
 - **5.5 — Status:** status from the fridge's latest import (A22, D3), priority Excursion > Warming > Data gaps > OK; a recovered excursion still counts (O1); the status import is the one whose readings end latest (O2).
-- **Main files:** `server/src/analysis/{rules.ts,interval.ts,gaps.ts,runs.ts,spikes.ts,excursions.ts,warming.ts,status.ts,index.ts}`, `server/test/unit/analysis/*.test.ts`.
+- **Main files (as built):** `server/src/analysis/{rules.ts,analyze.ts}`, `server/test/unit/analysis.test.ts` (2 files instead of one per rule — simpler to read).
 - **Tests (table-driven):** Tel Aviv 4.1 / 9.4 / 4.3 → one spike, no excursion; Rishon 4.6 / 5.4 / 6.3 / 7.1 → excursion from 06:15, ongoing; Jerusalem 06:15 → 08:30 → gap; exactly 5.0 → in range; single high reading at start/end of data or next to a gap/invalid reading → excursion; gap inside excursion → flagged; `ERR` inside a run treated as missing; no gap inferred between imports (D1); no sequence crosses an import boundary (O3); warming cases (D2, O4); status cases (D3, O1, O2).
 - **Done when:** All analysis tests pass; `analysis/` imports nothing from persistence, API, Express or React and reads no clock; every finding references the readings it came from; D1–D3 and O1–O4 recorded in the docs.
 - **Depends on:** Phases 1, 3 (types and normalised readings). Independent of persistence.
@@ -114,7 +114,7 @@ At each checkpoint: Claude presents options with trade-offs → user decides →
 
 - **Goal:** Expose overview and fridge detail with computed analysis.
 - **Implement:** `GET /api/fridges` (fridge list with status and latest reading — no finding counts) and `GET /api/fridges/:id` (fridge, status, imports each with their own findings — gaps, spikes, excursions, warming — and readings with raw values/logger/import). Handlers load readings via repositories and call `analysis/`; 404 for unknown fridge.
-- **Main files:** `server/src/api/routes/fridges.ts`, a small fridge query service, `server/test/integration/api-fridges.test.ts`.
+- **Main files (as built):** `server/src/api/fridges.ts`, `server/src/fridges/service.ts`, `server/test/integration/api-fridges.test.ts`.
 - **Tests (Supertest, seeded in-memory DB):** overview lists all sample fridges with expected statuses; detail for Rishon shows the excursion; detail for Tel Aviv Walk-in shows the spike and no Display 2 readings; unknown id → 404.
 - **Done when:** Tests pass.
 - **Depends on:** Phases 4, 5.
@@ -133,8 +133,8 @@ At each checkpoint: Claude presents options with trade-offs → user decides →
 ## Phase 9 — Fridge detail / history
 
 - **Goal:** Answer "when did this fridge go above 5 °C, and for how long?" with traceable evidence.
-- **Implement:** `/fridges/:id` page: status header; `TemperatureChart` (Recharts) with 5 °C reference line, shaded excursions, spike markers, gaps as line breaks; "Above 5 °C" list (start, end, duration, peak, *ongoing* / *contains missing data*); gaps and spikes lists (`EventList`); collapsible readings table with raw text, °C, logger and import.
-- **Main files:** `client/src/pages/FridgeDetail.tsx`, `client/src/components/{TemperatureChart.tsx,EventList.tsx}`.
+- **Implement:** `/fridges/:id` page: status header; `TemperatureChart` (Recharts) with 5 °C reference line, shaded excursions, line breaks at invalid readings, gaps and between files; findings per uploaded file ("Above 5 °C" with start, end/ongoing, duration, peak, missing-data note; warming; gaps; spikes); collapsible list of readings with time, °C and raw values.
+- **Main files (as built):** `client/src/pages/FridgeDetail.tsx`, `client/src/components/TemperatureChart.tsx`.
 - **Tests:** Manual verification at phone width with seeded data, including Tel Aviv Walk-in vs Display 2 history and the Haifa `ERR` row visible in the readings table.
 - **Done when:** For every sample scenario, the page shows the finding and the raw readings behind it.
 - **Depends on:** Phases 6b, 8.
@@ -143,10 +143,10 @@ At each checkpoint: Claude presents options with trade-offs → user decides →
 ## Phase 10 — Integration and final testing
 
 - **Goal:** Confidence that the whole system works from a clean clone.
-- **Implement:** Create the **`assignment-review` Skill** (step 10.0). Fill test gaps found during Phases 7–9; end-to-end check of the full flow (upload → import → overview → detail) with every sample file, on a clean database; verify `npm install` → `npm run build && npm start` from a fresh clone; check phone access over the local network. Optional: one Playwright end-to-end test if time allows.
-- **Main files:** `server/test/**`, `sample-data/*`, `.claude/skills/assignment-review/`.
+- **Implement:** ~~Create the `assignment-review` Skill (step 10.0)~~ — intentionally skipped (see *Planned Claude Code Skills*). Fill test gaps found during Phases 7–9; end-to-end check of the full flow (upload → import → overview → detail) with every sample file, on a clean database; verify `npm install` → `npm run build && npm start` from a fresh clone; check phone access over the local network. Optional: one Playwright end-to-end test if time allows.
+- **Main files:** `server/test/**`, `sample-data/*`.
 - **Tests:** Full suite green; any skipped/failing tests reported, not hidden.
-- **Done when:** Full suite passes; clean-clone run verified; `assignment-review` Skill run and its findings addressed or recorded.
+- **Done when:** Full suite passes; clean-clone run verified; review findings addressed or recorded.
 - **Depends on:** Phases 1–9.
 - **Blocking decisions:** none.
 
@@ -156,7 +156,7 @@ At each checkpoint: Claude presents options with trade-offs → user decides →
 - **Implement:**
   - `README.md`: prerequisites (Node version), clone → install → seed → run in a few minutes, dev mode, running tests, opening on a phone, where the docs are.
   - `NOTES.md` (finalised from the running draft): time spent; decisions Summer didn't ask for and why; questions for Summer (from `requirements.md` §5); what's not done and what we'd do with one more hour; how AI tools were used, including one thing they got wrong or we rejected, how it was caught, and where it's visible in the repo; anything else about the approach.
-  - Final run of the `assignment-review` Skill; confirm the repository is public before submitting.
+  - Final check against the assignment's submission list; confirm the repository is public before submitting.
 - **Main files:** `README.md`, `NOTES.md`, docs touch-ups.
 - **Tests:** Follow the README literally on a clean clone.
 - **Done when:** Assignment review passes; README verified from scratch; all NOTES topics covered.
@@ -184,6 +184,6 @@ At each checkpoint: Claude presents options with trade-offs → user decides →
 - [ ] **Phase 6b** — API: fridge endpoints
 - [ ] **Phase 8** — Fridge overview
 - [ ] **Phase 9** — Fridge detail / history
-- [ ] **Phase 10.0** — Create `assignment-review` Skill
+- [x] ~~**Phase 10.0** — Create `assignment-review` Skill~~ — intentionally skipped
 - [ ] **Phase 10** — Integration and final testing
 - [ ] **Phase 11** — README, NOTES, final assignment review

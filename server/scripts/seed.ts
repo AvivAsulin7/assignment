@@ -19,6 +19,8 @@ const uploads = [
   { file: 'rishon-lezion-cream-cakes-TL-0388.csv', loggerId: 'TL-0388', branch: 'Rishon LeZion', fridge: 'Cream cakes', unit: 'C' },
   // Same logger, moved to the new display fridge; branch typed in lower case as in Summer's sheet.
   { file: 'tel-aviv-display-2-TL-0417.csv', loggerId: 'TL-0417', branch: 'tel aviv', fridge: 'Display 2', unit: 'C' },
+  // Made-up extra fridge: an afternoon excursion that recovers.
+  { file: 'jerusalem-display-TL-0520.csv', loggerId: 'TL-0520', branch: 'Jerusalem', fridge: 'Display', unit: 'C' },
 ] as const;
 
 const dbPath = process.env.DB_PATH ?? DEFAULT_DB_PATH;

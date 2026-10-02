@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent, type FormEvent } from 'react';
+import { useState, type ChangeEvent, type SubmitEvent } from 'react';
 import { Link } from 'react-router';
 import { postJson } from '../api';
 import type { ColumnMapping, ImportSummary, SkippedRow, Unit, UploadPreview } from '../types';
@@ -58,7 +58,7 @@ export function Upload() {
     }
   }
 
-  async function onImport(e: FormEvent) {
+  async function onImport(e: SubmitEvent) {
     e.preventDefault();
     if (!file || !preview?.columns || busy) return;
     setBusy('import');
@@ -139,6 +139,16 @@ export function Upload() {
                 ) : (
                   <>
                     <p>We couldn't tell which columns hold the time and temperature. Please choose them.</p>
+                    <div className="warning">
+                      <p>
+                        The first row of the file is being used as column names:{' '}
+                        <strong>{preview.headers.map((h) => `“${h}”`).join(', ')}</strong>.
+                      </p>
+                      <p>
+                        Files without a header row are not supported: if that row is actually a reading, it will not be
+                        imported. Add a header row (for example <code>Time,Temp</code>) and upload the file again.
+                      </p>
+                    </div>
                     <ColumnSelect id="col-timestamp" label="Time column" headers={preview.headers} value={columns.timestamp}
                       onChange={(v) => onColumnChange('timestamp', v)} disabled={busy !== null} />
                     <ColumnSelect id="col-temperature" label="Temperature column" headers={preview.headers} value={columns.temperature}
@@ -251,7 +261,7 @@ function ColumnSelect(props: {
       <label htmlFor={id}>{props.label}</label>
       <select id={id} value={props.value ?? ''} onChange={(e) => props.onChange(e.target.value)} disabled={props.disabled}>
         <option value="">Choose…</option>
-        {props.headers.map((h, i) => (
+        {props.headers.map((_, i) => (
           <option key={i} value={i}>
             {columnLabel(props.headers, i)}
           </option>

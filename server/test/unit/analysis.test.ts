@@ -197,6 +197,24 @@ describe('gradual warming (A21, D2, O4)', () => {
     expect(one(series(1, '2026-09-14 06:00', [4.0, 4.1, 9.4, 4.3])).warming).toEqual([]);
   });
 
+  it('does not count a door-opening spike after two small rises as warming (3.9 → 4.0 → 4.1 → 9.4 → 4.3)', () => {
+    const a = one(series(1, '2026-09-14 05:30', [3.9, 4.0, 4.1, 9.4, 4.3]));
+    expect(a.spikes).toHaveLength(1);
+    expect(a.warming).toEqual([]);
+  });
+
+  it('lets a spike end a warming sequence, keeping the rise before it', () => {
+    const a = one(series(1, '2026-09-14 06:00', [2.0, 2.5, 3.0, 3.5, 4.0, 9.0, 4.0]));
+    expect(a.spikes).toHaveLength(1);
+    expect(a.warming).toMatchObject([{ fromC: 2.0, toC: 4.0, riseC: 2.0 }]);
+  });
+
+  it('still counts a sustained rise above 5 °C (not a spike) as warming', () => {
+    const a = one(series(1, '2026-09-14 06:00', [4.0, 4.6, 5.4, 6.3, 4.0]));
+    expect(a.spikes).toEqual([]);
+    expect(a.warming).toMatchObject([{ fromC: 4.0, toC: 6.3 }]);
+  });
+
   it('breaks the sequence on an unchanged reading', () => {
     expect(one(series(1, '2026-09-14 06:00', [3.0, 3.5, 3.5, 4.0, 4.5])).warming).toEqual([]);
   });

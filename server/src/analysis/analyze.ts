@@ -161,6 +161,8 @@ export function analyzeImport(importId: number, readings: AnalysisReading[]): Im
   }
 
   // A21 / D2 / O4: consecutive valid readings, each warmer than the one before, no gap between.
+  // An isolated spike (one-reading door jump) is not part of a trend: it ends the sequence.
+  const spikeIds = new Set(spikes.map((s) => s.readingId));
   const warming: Warming[] = [];
   let runStart = 0;
   for (let k = 1; k <= n; k++) {
@@ -168,6 +170,8 @@ export function analyzeImport(importId: number, readings: AnalysisReading[]): Im
       k < n &&
       r[k - 1].temperatureC !== null &&
       r[k].temperatureC !== null &&
+      !spikeIds.has(r[k - 1].id) &&
+      !spikeIds.has(r[k].id) &&
       !gapAfter[k - 1] &&
       r[k].temperatureC! > r[k - 1].temperatureC!;
     if (continues) continue;

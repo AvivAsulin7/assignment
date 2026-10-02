@@ -279,6 +279,26 @@ describe('importUpload', () => {
     expect(count('imports')).toBe(0);
   });
 
+  it('treats logger IDs that differ only in case or spacing as the same logger (no duplicate readings)', () => {
+    importUpload(db, upload({ loggerId: 'TL-0512' }), NOW);
+    const again = importUpload(db, upload({ loggerId: ' tl-0512 ' }), NOW);
+    expect(again.counts).toMatchObject({ inserted: 0, duplicates: 2, conflicts: 0 });
+    expect(count('readings')).toBe(2);
+    expect(db.prepare('SELECT DISTINCT logger_id FROM imports').all()).toEqual([{ logger_id: 'TL-0512' }]);
+  });
+
+  it('stores the normalized (upper-case) logger ID on the import and its readings', () => {
+    importUpload(db, upload({ loggerId: 'tl-0417b' }), NOW);
+    expect(db.prepare('SELECT logger_id FROM imports').get()).toEqual({ logger_id: 'TL-0417B' });
+    expect(db.prepare('SELECT DISTINCT logger_id FROM readings').all()).toEqual([{ logger_id: 'TL-0417B' }]);
+  });
+
+  it('detects a conflict against the same logger typed in different case', () => {
+    importUpload(db, upload({ loggerId: 'TL-0512' }), NOW);
+    const s = importUpload(db, upload({ loggerId: 'tl-0512', content: 'Time,Temp\n2026-09-14 06:00,9.9\n' }), NOW);
+    expect(s.counts).toMatchObject({ inserted: 0, conflicts: 1 });
+  });
+
   it('trims logger ID, branch and fridge before storing', () => {
     importUpload(db, upload({ loggerId: ' TL-0512 ', branch: ' Jerusalem ', fridge: ' Dairy ' }), NOW);
     expect(db.prepare('SELECT logger_id FROM imports').get()).toEqual({ logger_id: 'TL-0512' });
