@@ -50,19 +50,19 @@ Each item is a call we made where the email is silent or ambiguous.
 
 ### 2.1 Input files
 - **A1. Raw logger file format.** A raw logger file is a CSV with two meaningful columns: a timestamp and a temperature. It does **not** contain Logger ID, Branch or Fridge. The sample table in the assignment is Summer's *combined spreadsheet*, not a logger file. We generate our own sample raw files for development and demos.
-- **A2. Column identification.** The system first tries known case-insensitive header aliases for the timestamp and temperature columns (e.g. `time`, `timestamp`, `date`, `datetime` / `temp`, `temperature`, `value`, optionally with a unit suffix). If the columns cannot be identified confidently, the user selects the timestamp and temperature columns in the upload preview. No content-based automatic column inference in the MVP. Extra columns are ignored.
+- **A2. Column identification.** The system first tries known case-insensitive header aliases for the timestamp and temperature columns (e.g. `time`, `timestamp`, `date`, `datetime` / `temp`, `temperature`, optionally with a unit suffix). If the columns cannot be identified confidently, the user selects the timestamp and temperature columns in the upload preview. No content-based automatic column inference in the MVP. Extra columns are ignored.
 - **A3. Timestamp formats.** Supported: `YYYY-MM-DD HH:MM[:SS]` (space or `T` separator) and `DD/MM/YYYY HH:MM[:SS]`. Slash dates are always interpreted as **day/month** (Israeli convention, consistent with Haifa's `14/09/2026`). Rows whose timestamp cannot be parsed are rejected and reported.
 - **A4. Time zone.** Timestamps are treated as local branch time (Israel) and stored as-is, without time-zone conversion. DST transitions are a known limitation.
 
 ### 2.2 Upload & metadata
 - **A5. Upload flow.** Upload a raw CSV → system parses and shows a **preview** → user provides/confirms **Logger ID, Branch, Fridge, Temperature unit** → system imports, normalises, analyses and stores. Nothing is stored before the user confirms.
-- **A6. Preview contents.** Detected columns, total rows, valid / invalid / duplicate counts, first and last timestamp, a sample of parsed rows, and any warnings (e.g. suspicious unit).
+- **A6. Preview contents.** Detected columns, total rows, valid / invalid / duplicate counts, first and last timestamp, and a sample of parsed rows.
 - **A7. Fridge assignment is stored with the readings.** Each import records the Logger ID → Branch → Fridge assignment given at upload time, and every reading from that import belongs to that fridge permanently. If TL-0417 is later uploaded as Tel Aviv / Display 2, earlier readings stay with Tel Aviv / Walk-in. There is no separate assignment-management system.
 - **A8. Name normalisation.** Branch and fridge names are matched case-insensitively with trimmed/collapsed whitespace (`tel aviv` = `Tel Aviv`). The first spelling used is kept for display. The upload form suggests existing branch/fridge names to reduce typos.
 
 ### 2.3 Units
 - **A9. Unit is chosen by the user, never auto-detected.** Default is Celsius. Fahrenheit values are converted deterministically: `°C = (°F − 32) × 5/9`. All analysis uses Celsius.
-- **A10. Suspicious-unit warning.** The preview warns (but does not change anything) when values look implausible for the chosen unit — e.g. Celsius selected but most values are above ~20, or Fahrenheit selected but most values are below ~20. Exact thresholds are documented in code.
+- **A10. No suspicious-unit warning.** Considered (warning when values look implausible for the chosen unit) but intentionally left out of the MVP: the assignment gives no sufficiently defined threshold, and an invented one could produce misleading warnings. The user explicitly selects °C/°F at upload; the system never guesses or overrides that choice.
 - **A11. Original values are preserved.** Each stored reading keeps its raw timestamp text, raw temperature text, the selected unit, and the normalised Celsius value.
 
 ### 2.4 Data cleaning
@@ -100,7 +100,7 @@ All analysis runs on a fridge's full stored history (across uploads), in Celsius
 ## 3. MVP scope
 
 1. **Raw CSV upload** with flexible time/temperature column identification (A1–A3).
-2. **Upload preview** before import, with counts, sample rows and warnings (A5–A6, A10).
+2. **Upload preview** before import, with counts and sample rows (A5–A6).
 3. **Metadata entry at upload:** Logger ID, Branch, Fridge, Unit (default °C) (A5, A8, A9).
 4. **Normalisation:** Fahrenheit → Celsius, timestamp parsing, chronological sorting, invalid-reading handling, duplicate/conflict handling (A9–A14).
 5. **Fridge assignment preserved per import** so logger moves don't rewrite history (A7).
@@ -122,7 +122,7 @@ All analysis runs on a fridge's full stored history (across uploads), in Celsius
 - Deployment or hosting.
 - Export / print of reports.
 - Logger-to-fridge assignment management (beyond recording the assignment given at each upload).
-- Automatic unit detection.
+- Automatic unit detection and suspicious-unit warnings (A9, A10).
 - AI/ML or statistical anomaly detection.
 - Too-cold / freezing detection.
 - Time-zone and DST handling.

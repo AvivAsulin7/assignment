@@ -57,9 +57,9 @@ At each checkpoint: Claude presents options with trade-offs → user decides →
 ## Phase 3 — Normalisation
 
 - **Goal:** Turn parsed rows into normalised readings while preserving raw values (A3, A9–A14).
-- **Implement:** `normalization/` module: timestamp parsing (`YYYY-MM-DD[ T]HH:MM[:SS]`, `DD/MM/YYYY HH:MM[:SS]`, slash always DD/MM, invalid calendar dates rejected); temperature parsing (`ERR`/empty/non-numeric → invalid with reason); °F → °C by the user-selected unit; chronological sort; in-file duplicate vs conflict detection; suspicious-unit hints; raw text kept alongside every normalised value; counts for preview/summary.
+- **Implement:** `normalization/` module: timestamp parsing (`YYYY-MM-DD[ T]HH:MM[:SS]`, `DD/MM/YYYY HH:MM[:SS]`, slash always DD/MM, invalid calendar dates rejected); temperature parsing (`ERR`/empty/non-numeric → invalid with reason); °F → °C by the user-selected unit; chronological sort; in-file duplicate vs conflict detection; raw text kept alongside every normalised value; counts for preview/summary.
 - **Main files:** `server/src/normalization/*`, `server/src/domain/types.ts`, `server/test/unit/normalization.test.ts`.
-- **Tests:** Both formats; `31/02/2026` rejected; `05/09/2026` read as 5 September; 38.3 °F → 3.5 °C and 39.0 °F → 3.9 °C; `ERR` → invalid, not 0; out-of-order rows sorted (TL-0417 05:45); exact duplicate (Jerusalem 06:15 3.9) vs same timestamp with different value; unit hints for °C-selected-but-looks-°F and vice versa.
+- **Tests:** Both formats; `31/02/2026` rejected; `05/09/2026` read as 5 September; 38.3 °F → 3.5 °C and 39.0 °F → 3.9 °C; `ERR` → invalid, not 0; out-of-order rows sorted (TL-0417 05:45); exact duplicate (Jerusalem 06:15 3.9) vs same timestamp with different value.
 - **Done when:** All tests pass; parsing → normalisation pipeline works on the assignment scenarios as pure functions.
 - **Depends on:** Phases 1–2.
 - **Blocking decisions:** none.
@@ -87,7 +87,7 @@ At each checkpoint: Claude presents options with trade-offs → user decides →
 ## Phase 7 — Frontend upload flow
 
 - **Goal:** Summer can upload a raw CSV from her phone, preview it, enter metadata and import it.
-- **Implement:** `/upload` page with three steps: choose file → preview (detected columns or two column dropdowns, counts, date range, sample rows, unit hints) + form (Logger ID, Branch, Fridge, °C/°F defaulting to °C) → result summary (inserted/invalid/rejected/duplicates/conflicts). `api.ts` fetch wrapper and `types.ts`. Mobile-first CSS. Branch/fridge suggestions are added in Phase 8 once `GET /api/fridges` exists.
+- **Implement:** `/upload` page with three steps: choose file → preview (detected columns or two column dropdowns, counts, date range, sample rows) + form (Logger ID, Branch, Fridge, °C/°F defaulting to °C) → result summary (inserted/invalid/rejected/duplicates/conflicts). `api.ts` fetch wrapper and `types.ts`. Mobile-first CSS. Branch/fridge suggestions are added in Phase 8 once `GET /api/fridges` exists.
 - **Main files:** `client/src/pages/Upload.tsx`, `client/src/{api.ts,types.ts}`, `client/src/styles.css`.
 - **Tests:** Manual verification at phone width (≈375 px) with the sample files, including the not-confident column path and the Haifa °F file. Automated UI tests not planned (architecture §8).
 - **Done when:** Every file in `sample-data/` can be previewed and imported through the UI; the summary matches the service tests.

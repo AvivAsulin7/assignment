@@ -46,10 +46,9 @@ User picks a CSV
                        detect timestamp/temperature columns via case-insensitive aliases (A2)
                        or apply the user's column choice if provided
        normalization:  parse timestamps and temperature values, sort,
-                       count invalid rows, rejected rows, in-file duplicates/conflicts,
-                       compute suspicious-unit hints (A10)
+                       count invalid rows, rejected rows, in-file duplicates/conflicts
   ← preview: column detection result (confident / candidates), counts,
-             first/last timestamp, sample rows, unit hints
+             first/last timestamp, sample rows
 ```
 
 If columns cannot be identified confidently, the preview says so and the UI asks the user to pick them; the preview is re-requested with `columns` set.
@@ -87,7 +86,7 @@ Analysis always runs over the fridge's **full stored history**, across all impor
 |---|---|---|
 | **`domain/`** | Shared domain types (`ParsedRow`, `NormalizedReading`, `Excursion`, `Gap`, `Spike`, …) and the name-key helper (trim, collapse whitespace, lower-case). | Any I/O or rules beyond name keys. |
 | **`parsing/`** | CSV text → header + string cells (via PapaParse). Column detection by alias. Applying a user-selected column mapping. Reporting "not confident". | Interpreting values (dates, numbers, units). Database. HTTP. Outputs strings only. |
-| **`normalization/`** | Timestamp parsing for the supported formats (A3) into canonical local time. Temperature parsing (`ERR`/empty/non-numeric → invalid with reason, A12). °F → °C conversion (A9). Chronological sort (A13). In-file duplicate/conflict detection. Suspicious-unit hints (A10). Keeps raw text alongside every normalised value (A11). | Database. Fridges/loggers. Analysis rules. HTTP. Pure functions only. |
+| **`normalization/`** | Timestamp parsing for the supported formats (A3) into canonical local time. Temperature parsing (`ERR`/empty/non-numeric → invalid with reason, A12). °F → °C conversion (A9). Chronological sort (A13). In-file duplicate/conflict detection. Keeps raw text alongside every normalised value (A11). | Database. Fridges/loggers. Analysis rules. HTTP. Pure functions only. |
 | **`imports/`** | Orchestrates preview and import: parse → normalise → persist. Find-or-create fridge. Duplicate/conflict detection against stored readings. Transaction boundary. Import summary. | CSV details, temperature rules, SQL text (uses repositories), HTTP. |
 | **`analysis/`** | Pure functions from one fridge's chronologically sorted readings to gaps, above-threshold runs, isolated spikes, excursions, warming findings and status. All thresholds/parameters are named constants in one place. No clock: any "now" or time window is an explicit argument. | Database, parsing, units (only ever sees °C), HTTP, React, Express. |
 | **`persistence/`** | Schema (`schema.sql`, applied at startup with `CREATE TABLE IF NOT EXISTS`), database connection, repositories with plain SQL, transactions. Enforces the unique key. | Business rules. |
@@ -106,7 +105,7 @@ Three pages, mobile-first, plain CSS, no state-management library (each page fet
 
 2. **Upload — `/upload`**, a single page with three steps:
    1. *Choose file* — one CSV at a time.
-   2. *Preview & confirm* — detected columns (or two dropdowns when not confident), counts, date range, sample rows, unit hints. Form for Logger ID, Branch, Fridge (with suggestions from existing fridges) and a °C/°F toggle defaulting to °C. Import button.
+   2. *Preview & confirm* — detected columns (or two dropdowns when not confident), counts, date range, sample rows. Form for Logger ID, Branch, Fridge (with suggestions from existing fridges) and a °C/°F toggle defaulting to °C. Import button.
    3. *Result* — import summary (including duplicates and conflicts) and a link to the fridge.
 
 3. **Fridge detail — `/fridges/:id`**
@@ -203,7 +202,7 @@ Four endpoints. No others unless implementation proves one is necessary.
 
 | Method & path | Purpose | Request | Response (outline) |
 |---|---|---|---|
-| `POST /api/uploads/preview` | Parse and validate a file without storing anything | `{ filename, content, columns? }` | `{ columns: { timestamp, temperature, confident, candidates }, counts, firstAt, lastAt, sampleRows, unitHints }` |
+| `POST /api/uploads/preview` | Parse and validate a file without storing anything | `{ filename, content, columns? }` | `{ columns: { timestamp, temperature, confident, candidates }, counts, firstAt, lastAt, sampleRows }` |
 | `POST /api/imports` | Confirm and import | `{ filename, content, columns, loggerId, branch, fridge, unit }` | `{ importId, fridgeId, counts, conflicts }` |
 | `GET /api/fridges` | Overview | — | `[{ id, branch, name, status, latestReading, counts }]` (also used for name suggestions) |
 | `GET /api/fridges/:id` | Fridge detail with analysis | — | `{ fridge, status, readings, excursions, spikes, gaps, warming }` |
@@ -241,7 +240,7 @@ Priority: parsing, normalisation and analysis rules — this is where correctnes
 
 ### Unit tests (Vitest, pure functions, bulk of the effort)
 - **Parsing:** alias detection in any column order and case; extra columns; not-confident result; applying a user column mapping; BOM, CRLF, empty file, header-only file.
-- **Normalisation:** both timestamp formats; invalid dates rejected (e.g. `31/02/2026`); slash dates always DD/MM; °F → °C (38.3 °F → 3.5 °C); `ERR`/empty → invalid; sorting; in-file duplicates vs conflicts; unit hints.
+- **Normalisation:** both timestamp formats; invalid dates rejected (e.g. `31/02/2026`); slash dates always DD/MM; °F → °C (38.3 °F → 3.5 °C); `ERR`/empty → invalid; sorting; in-file duplicates vs conflicts.
 - **Analysis**, table-driven from the assignment's scenarios:
   - Tel Aviv 4.1 / **9.4** / 4.3 → one isolated spike, no excursion.
   - Rishon 4.6 / 5.4 / 6.3 / 7.1 → excursion starting 06:15, ongoing.

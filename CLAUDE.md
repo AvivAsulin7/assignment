@@ -73,3 +73,17 @@ The assignment asks us to explain how AI tools were used, so the process should 
 - Clearly call out any non-obvious assumption, architectural change or trade-off Claude proposes, so it can be reviewed.
 - Do not hide uncertainty — say when something is a guess or unverified.
 - Make reasoning and rejected alternatives visible (in the conversation, commit messages, or docs/notes) rather than silently choosing.
+
+## Scope and implementation size
+
+This is a time-boxed take-home assignment, not a production system.
+
+Prefer the smallest clear implementation that satisfies the documented requirements.
+
+- Do not over-engineer.
+- Do not introduce abstractions for hypothetical future needs.
+- Do not add features that are not required by the current phase.
+- Prefer fewer files and simpler code when the behavior remains clear and testable.
+- Keep implementations small enough to be reviewed and explained by a human.
+- Before adding a new abstraction, dependency, layer, or significant amount of code, ask whether it is necessary for the current requirements.
+- If a simpler solution is sufficient for the take-home, prefer it and mention the production tradeoff separately.
