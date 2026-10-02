@@ -11,7 +11,7 @@ Companion to [`requirements.md`](./requirements.md). This document describes *ho
 Three pieces, one laptop:
 
 - **Web app** — React + TypeScript single-page app, built with Vite. Mobile-first.
-- **API server** — Node.js + TypeScript, Express, REST/JSON. In production mode it also serves the built web app, so there is one process, one port and one URL (reachable from a phone on the same network).
+- **API server** — Node.js + TypeScript, Express, REST/JSON. In production mode it also serves the built client app, so there is one process, one port and one URL (reachable from a phone on the same network).
 - **Database** — a single SQLite file, accessed via better-sqlite3.
 
 ```
@@ -91,7 +91,7 @@ Analysis always runs over the fridge's **full stored history**, across all impor
 | **`imports/`** | Orchestrates preview and import: parse → normalise → persist. Find-or-create fridge. Duplicate/conflict detection against stored readings. Transaction boundary. Import summary. | CSV details, temperature rules, SQL text (uses repositories), HTTP. |
 | **`analysis/`** | Pure functions from one fridge's chronologically sorted readings to gaps, above-threshold runs, isolated spikes, excursions, warming findings and status. All thresholds/parameters are named constants in one place. No clock: any "now" or time window is an explicit argument. | Database, parsing, units (only ever sees °C), HTTP, React, Express. |
 | **`persistence/`** | Schema (`schema.sql`, applied at startup with `CREATE TABLE IF NOT EXISTS`), database connection, repositories with plain SQL, transactions. Enforces the unique key. | Business rules. |
-| **`api/`** | Express app factory, routes, Zod request validation, mapping domain errors to HTTP status codes, response shaping, serving the built web app. | Business logic — handlers are thin and delegate to services. |
+| **`api/`** | Express app factory, routes, Zod request validation, mapping domain errors to HTTP status codes, response shaping, serving the built client app. | Business logic — handlers are thin and delegate to services. |
 
 The Express app is created by a factory (`createApp(db)`) so integration tests can run it against an in-memory database.
 
@@ -114,7 +114,7 @@ Three pages, mobile-first, plain CSS, no state-management library (each page fet
 
 Shared components: `StatusBadge`, `TemperatureChart`, `EventList`.
 
-The web app keeps its own `types.ts` for API responses rather than a shared package; API response shapes are pinned by the backend integration tests.
+The client app keeps its own `types.ts` for API responses rather than a shared package; API response shapes are pinned by the backend integration tests.
 
 ---
 
@@ -297,7 +297,7 @@ npm workspaces with two packages.
 │     ├─ unit/
 │     ├─ integration/
 │     └─ fixtures/
-└─ web/
+└─ client/
    ├─ package.json  tsconfig.json  vite.config.ts  index.html
    └─ src/
       ├─ main.tsx
@@ -306,7 +306,7 @@ npm workspaces with two packages.
       └─ components/            StatusBadge, TemperatureChart, EventList
 ```
 
-Reviewer workflow (to be detailed in `README.md`): `npm install` → optionally `npm run seed` → `npm run build && npm start` → open `http://localhost:3000`. `npm run dev` runs server and web with hot reload for development.
+Reviewer workflow (to be detailed in `README.md`): `npm install` → optionally `npm run seed` → `npm run build && npm start` → open `http://localhost:3000`. `npm run dev` runs server and client with hot reload for development.
 
 ---
 
@@ -328,7 +328,7 @@ Reviewer workflow (to be detailed in `README.md`): `npm install` → optionally 
 |---|---|
 | **react-router** | Deep links to `/fridges/:id` and working back navigation on a phone. |
 | **tsx** (dev) | Run TypeScript server code and scripts without a separate build step during development. |
-| **concurrently** (dev) | Start server and web together with a single cross-platform `npm run dev`. |
+| **concurrently** (dev) | Start server and client together with a single cross-platform `npm run dev`. |
 
 ### Deliberately not used
 - No ORM or migration tool — three tables, schema applied at startup.

@@ -33,12 +33,12 @@ At each checkpoint: Claude presents options with trade-offs → user decides →
 
 - **Goal:** An empty but runnable, testable monorepo skeleton.
 - **Implement:**
-  - Root `package.json` with npm workspaces (`server`, `web`) and scripts: `dev`, `build`, `start`, `test`, `seed`.
-  - `server/`: TypeScript config, Vitest config, Express `createApp(db)` factory and `index.ts` (no routes yet beyond serving the built web app in production mode), better-sqlite3 connection helper.
-  - `web/`: Vite + React + TS scaffold, dev proxy `/api` → server, react-router with three empty routes.
+  - Root `package.json` with npm workspaces (`server`, `client`) and scripts: `dev`, `build`, `start`, `test`, `seed`.
+  - `server/`: TypeScript config, Vitest config, Express `createApp(db)` factory and `index.ts` (no routes yet beyond serving the built client app in production mode), better-sqlite3 connection helper.
+  - `client/`: Vite + React + TS scaffold, dev proxy `/api` → server, react-router with three empty routes.
   - `domain/` name-key helper (trim, collapse whitespace, lower-case) — first real code, used to prove the test setup.
   - `.gitignore` (node_modules, build output, SQLite file); `NOTES.md` draft.
-- **Main files:** `package.json`, `server/{package.json,tsconfig.json,vitest.config.ts}`, `server/src/{index.ts,api/app.ts,persistence/db.ts,domain/names.ts}`, `web/{package.json,vite.config.ts,index.html,src/main.tsx}`, `NOTES.md`.
+- **Main files:** `package.json`, `server/{package.json,tsconfig.json,vitest.config.ts}`, `server/src/{index.ts,api/app.ts,persistence/db.ts,domain/names.ts}`, `client/{package.json,vite.config.ts,index.html,src/main.tsx}`, `NOTES.md`.
 - **Tests:** Unit tests for the name-key helper (`"tel aviv"` ≡ `" Tel  Aviv "`).
 - **Done when:** `npm install`, `npm test`, `npm run dev` and `npm run build && npm start` all work on a clean clone; the empty app opens in the browser.
 - **Depends on:** —
@@ -88,7 +88,7 @@ At each checkpoint: Claude presents options with trade-offs → user decides →
 
 - **Goal:** Summer can upload a raw CSV from her phone, preview it, enter metadata and import it.
 - **Implement:** `/upload` page with three steps: choose file → preview (detected columns or two column dropdowns, counts, date range, sample rows, unit hints) + form (Logger ID, Branch, Fridge, °C/°F defaulting to °C) → result summary (inserted/invalid/rejected/duplicates/conflicts). `api.ts` fetch wrapper and `types.ts`. Mobile-first CSS. Branch/fridge suggestions are added in Phase 8 once `GET /api/fridges` exists.
-- **Main files:** `web/src/pages/Upload.tsx`, `web/src/{api.ts,types.ts}`, `web/src/styles.css`.
+- **Main files:** `client/src/pages/Upload.tsx`, `client/src/{api.ts,types.ts}`, `client/src/styles.css`.
 - **Tests:** Manual verification at phone width (≈375 px) with the sample files, including the not-confident column path and the Haifa °F file. Automated UI tests not planned (architecture §8).
 - **Done when:** Every file in `sample-data/` can be previewed and imported through the UI; the summary matches the service tests.
 - **Depends on:** Phase 6a.
@@ -123,7 +123,7 @@ At each checkpoint: Claude presents options with trade-offs → user decides →
 
 - **Goal:** "See, in one place, how every fridge is doing and where something is wrong" on a phone.
 - **Implement:** `/` page: fridges grouped by branch, problems first; fridge cards with `StatusBadge`, latest reading and time, finding counts; link to detail. Add branch/fridge suggestions to the upload form from `GET /api/fridges`.
-- **Main files:** `web/src/pages/Overview.tsx`, `web/src/components/StatusBadge.tsx`, `web/src/pages/Upload.tsx`.
+- **Main files:** `client/src/pages/Overview.tsx`, `client/src/components/StatusBadge.tsx`, `client/src/pages/Upload.tsx`.
 - **Tests:** Manual verification at phone and desktop widths with seeded data.
 - **Done when:** Seeded data shows the expected statuses (Rishon excursion, Tel Aviv spike not alarmed, Jerusalem gap, Haifa correct in °C).
 - **Depends on:** Phase 6b.
@@ -133,7 +133,7 @@ At each checkpoint: Claude presents options with trade-offs → user decides →
 
 - **Goal:** Answer "when did this fridge go above 5 °C, and for how long?" with traceable evidence.
 - **Implement:** `/fridges/:id` page: status header; `TemperatureChart` (Recharts) with 5 °C reference line, shaded excursions, spike markers, gaps as line breaks; "Above 5 °C" list (start, end, duration, peak, *ongoing* / *contains missing data*); gaps and spikes lists (`EventList`); collapsible readings table with raw text, °C, logger and import.
-- **Main files:** `web/src/pages/FridgeDetail.tsx`, `web/src/components/{TemperatureChart.tsx,EventList.tsx}`.
+- **Main files:** `client/src/pages/FridgeDetail.tsx`, `client/src/components/{TemperatureChart.tsx,EventList.tsx}`.
 - **Tests:** Manual verification at phone width with seeded data, including Tel Aviv Walk-in vs Display 2 history and the Haifa `ERR` row visible in the readings table.
 - **Done when:** For every sample scenario, the page shows the finding and the raw readings behind it.
 - **Depends on:** Phases 6b, 8.

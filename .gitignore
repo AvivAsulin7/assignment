@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Local SQLite database (created at runtime)
+server/data/
+*.db
+*.db-wal
+*.db-shm
+
+# Test / tooling output
+coverage/
+
+# Environment and OS / editor files
+.env
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+NOTES.md
+
+# Personal Claude Code settings
+.claude/settings.local.json
