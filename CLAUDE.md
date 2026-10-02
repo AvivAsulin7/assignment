@@ -39,11 +39,7 @@ Instructions for Claude Code when working in this repository.
 
 ### Unresolved decisions — do not invent answers
 
-Currently unresolved (see `docs/architecture.md` §12):
-
-- the exact gradual-warming rule
-- the time window used for overview status
-- gap behavior between separate weekly imports
+D1–D3 and O1–O4 (gaps, warming, status, import boundaries) are decided — see `docs/requirements.md` A17, A21, A22 and §2.7. No analysis decisions are currently unresolved; any new one must be surfaced, not invented.
 
 **Do not invent or silently resolve a documented TBD.** If a task requires one of these decisions, stop and surface the decision to the user before implementing that behavior. Once decided, record it in the docs.
 

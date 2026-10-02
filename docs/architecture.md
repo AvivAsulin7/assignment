@@ -76,7 +76,7 @@ GET /api/fridges       → load each fridge's readings → analysis → status +
 GET /api/fridges/:id   → load the fridge's readings  → analysis → readings + findings
 ```
 
-Analysis always runs over the fridge's **full stored history**, across all imports and loggers that were assigned to it, so an excursion that spans two weekly files is seen as one event.
+Analysis loads the fridge's **full stored history** (all imports and loggers assigned to it), but **each import is analysed independently** (O3): no gap, spike, excursion or warming sequence crosses an import boundary. Findings from every import are returned, so history stays visible.
 
 ---
 
@@ -225,12 +225,14 @@ Components, each a separate pure function:
 | Function | Rule source |
 |---|---|
 | Expected interval per import | A16 |
-| Gap detection | A17 |
 | Above-threshold runs | A15, A18 |
 | Isolated spike classification | A19 |
 | Excursions (start, end, duration, peak, *ongoing*, *contains missing data*) | A20 |
-| Gradual warming | A21 — **rule unresolved**, see §11 |
-| Fridge status | A22 — **time window unresolved**, see §11 |
+| Gap detection, within one import only | A17, decision D1 |
+| Gradual warming (≥ 3 consecutive increases, ≥ 1.0 °C total, broken by a gap) | A21, decision D2 |
+| Fridge status, based on the fridge's latest import | A22, decision D3 |
+
+Every import is analysed independently (O3): readings are grouped by import, and no rule looks across an import boundary. Status follows O1 and O2 (`requirements.md` §2.7).
 
 ---
 
@@ -249,7 +251,9 @@ Priority: parsing, normalisation and analysis rules — this is where correctnes
   - Single high reading at the edge of data, or next to a gap / invalid reading → excursion, not spike.
   - Gap inside an excursion → flagged as containing missing data.
   - Excursion end = first valid reading ≤ 5.0 °C.
-  - Warming and status tests once those rules are decided.
+  - No gap between the last reading of one import and the first of the next (D1).
+  - Warming: Rishon 4.6 / 5.4 / 6.3 / 7.1 → warming; 3 increases totalling < 1.0 °C → not warming; a gap inside the sequence → not one sequence (D2).
+  - Status computed from the latest import only; older problems still returned for the detail view (D3).
 
 ### Integration tests (Vitest + Supertest, in-memory SQLite)
 - Preview stores nothing.
@@ -361,10 +365,19 @@ Reviewer workflow (to be detailed in `README.md`): `npm install` → optionally 
 
 ---
 
-## 12. Unresolved decisions
+## 12. Analysis decisions
 
-These are intentionally left open. The architecture accommodates them without committing to an answer.
+Resolved before Phase 5 (details and reasons in `requirements.md` A17, A21, A22):
 
-1. **Exact gradual-warming rule** (A21). Will live in its own pure function in `analysis/`, with parameters as named constants, under the constraints stated in `requirements.md`.
-2. **Exact time window used to determine overview status** (A22). The status function will receive the window and reference time as explicit arguments.
-3. **Gap behaviour between separate weekly imports** — e.g. how the period between the last reading of one import and the first reading of the next import for the same fridge is treated, and which expected interval applies.
+1. **D1 — Gaps within a single import only.** No gap is inferred between separate imports.
+2. **D2 — Gradual warming:** at least 3 consecutive increases (≥ 4 valid readings) with a total rise of at least 1.0 °C; need not cross 5 °C; a gap ends the sequence. Its own pure function in `analysis/`, parameters as named constants. MVP assumption to validate with Summer.
+3. **D3 — Overview status is based on the fridge's latest import.** History stays visible in the detail view.
+
+Also decided before Phase 5 (`requirements.md` §2.7):
+
+4. **O1 — A recovered excursion still makes the status *Excursion*.**
+5. **O2 — The status import is the one whose stored readings end latest** (reading timestamps, not `imported_at`); an import that added no readings never changes status.
+6. **O3 — Every import is analysed independently.** Gaps, spike neighbours, excursions and warming sequences never cross an import boundary.
+7. **O4 — An invalid reading breaks a warming sequence.**
+
+No analysis decisions are currently open.

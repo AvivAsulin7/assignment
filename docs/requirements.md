@@ -74,11 +74,12 @@ Each item is a call we made where the email is silent or ambiguous.
   - *The exact uniqueness strategy (what identifies "the same reading") is a data-model decision to be finalised during data-model design, since loggers can move between fridges.*
 
 ### 2.5 Analysis rules
-All analysis runs on a fridge's full stored history (across uploads), in Celsius.
+Analysis covers a fridge's full stored history, in Celsius, but each import is analysed independently: no rule looks across an import boundary (O3, §2.7).
 
 - **A15. Threshold.** "Above five degrees" means **strictly greater than 5.0 °C**. 5.0 exactly is within limits. The threshold is a single named constant.
-- **A16. Expected interval.** Not hard-coded to 15 minutes. For each import, the expected interval is the median spacing between consecutive valid timestamps.
+- **A16. Expected interval.** Not hard-coded to 15 minutes. For each import, the expected interval is the median spacing between consecutive valid timestamps — i.e. between all stored readings of that import, including invalid-temperature readings such as `ERR` (every stored reading has a valid timestamp; the logger was recording).
 - **A17. Gaps.** A gap is any period between two consecutive readings (valid or invalid timestamps) longer than **2 × the expected interval**. Gaps are shown as "no data" with start, end and duration. We do not guess the cause.
+  - **Decision D1 — gaps are detected within a single import only.** No gap is inferred from the time between the end of one import and the start of another. *Reason:* files are uploaded periodically, but nothing in the assignment guarantees that separate files form one continuous recording period, so we do not claim missing readings between separate uploads without evidence.
 - **A18. Above-threshold runs.** Consecutive valid readings > 5.0 °C form a run.
 - **A19. Isolated spike.** A run of exactly **one** reading, with a valid in-range reading immediately before and after it and no gap on either side, is classified as an **isolated spike** (possible door opening). It is shown, labelled, and kept — not alarmed as an excursion. A single high reading at the start/end of the data, or next to a gap or invalid reading, cannot be confirmed as isolated and is treated as an **excursion**.
 - **A20. Excursion.** Any above-threshold run that is not an isolated spike.
@@ -88,12 +89,25 @@ All analysis runs on a fridge's full stored history (across uploads), in Celsius
   - If no in-range reading follows, the excursion is **ongoing / open-ended**, and its duration is reported as "at least" (up to the last reading).
   - If a gap or invalid readings fall inside the excursion, it is flagged as **containing missing data** so the duration is clearly marked as uncertain.
   - Each excursion also reports its peak temperature and the readings it is based on.
-- **A21. Gradual warming.** Included in the MVP. The exact rule will be defined in a later step, subject to these constraints: simple, deterministic, explainable in one sentence, based only on stored readings, with its parameters as named constants, and no AI/ML. It must distinguish a sustained rise (like Rishon's 4.6 → 5.4 → 6.3 → 7.1) from a single jump. *(Rule: TBD — to be added here once agreed.)*
+- **A21. Gradual warming.** Included in the MVP. Constraints: simple, deterministic, explainable in one sentence, based only on stored readings, parameters as named constants, no AI/ML. It must distinguish a sustained rise (like Rishon's 4.6 → 5.4 → 6.3 → 7.1) from a single jump.
+  - **Decision D2 — rule:** a fridge is *warming* when it has **at least 3 consecutive temperature increases** (therefore at least **4 valid readings**) and the **total increase from the first to the last of those readings is at least 1.0 °C**.
+  - The sequence does not need to cross 5 °C.
+  - A data gap (A17) or an invalid reading (O4) ends the sequence; sequences never cross imports (O3).
+  - *Reason:* the assignment distinguishes a one-reading jump from a slowly warming fridge but gives no numbers. The 3 increases / 1.0 °C values are an **MVP assumption to validate with Summer before production** (see §5).
 
 ### 2.6 Presentation
-- **A22. Fridge status.** Each fridge gets one status for the overview, by priority: *Excursion* > *Warming* > *Data gaps* > *OK*. The overview must surface current/recent problems clearly. *The exact time window used to compute status is not yet decided*; the precise definition will be finalised together with the warming rule.
+- **A22. Fridge status.** Each fridge gets one status for the overview, by priority: *Excursion* > *Warming* > *Data gaps* > *OK*. The overview must surface current/recent problems clearly.
+  - **Decision D3 — the overview's current status is based on the fridge's latest import**, not its entire history and not an arbitrary number of days.
+  - Historical problems remain visible in the fridge history/detail view; they are never deleted or hidden.
+  - *Reason:* using all history could leave a fridge marked as a problem forever; a fixed window such as "last 7 days" is not supported by the assignment. The latest import is a simple, explainable boundary that follows the actual upload workflow. Details: O1, O2 (§2.7).
 - **A23. Mobile-first.** The UI is designed for a phone screen first and works on desktop. Phone access to a laptop-hosted app over the local network is documented in the README.
 - **A24. Single local user.** No login; data is stored locally in a file-based database.
+
+### 2.7 Analysis boundaries and status details (decided before Phase 5)
+- **O1 — Recovered excursion.** If the import that determines current status contains an excursion, the status is *Excursion* even if later readings in that same import are back to ≤ 5.0 °C. *Reason:* the excursion happened and Summer needs to see it; returning to normal does not erase the event.
+- **O2 — Which import determines current status.** Recency comes from the readings' timestamps, not from `imported_at`: the import whose stored readings end latest. An import that added no new readings (e.g. a re-upload where every row was a duplicate) has no readings and therefore never changes a fridge's current status.
+- **O3 — Every import is analysed independently.** Analysis sequences never join across separate imports, even for the same branch, fridge and logger: gaps, spike neighbour checks, excursions and warming sequences all stay within one import. "Start/end of the data" in A19 means the start/end of the import. An excursion still above 5 °C at the end of its import is *ongoing* for that import. *Reason:* the assignment does not guarantee that separate files form one continuous recording period; for the MVP an import is the analysis boundary.
+- **O4 — Invalid readings break warming.** An invalid reading (e.g. `ERR`) ends a warming sequence; we never skip over missing or invalid readings to build a trend. *Reason:* we do not know the temperature at that moment and do not interpolate or guess missing data.
 
 ---
 
@@ -145,3 +159,5 @@ All analysis runs on a fridge's full stored history (across uploads), in Celsius
 9. Would you want an alert (e.g. email/WhatsApp) when a problem is detected, and to whom? Note that with weekly uploads, a slow failure like Rishon's could still be found days late — would branches be willing to upload more often?
 10. Do you also care about fridges that get too cold?
 11. Is there anyone else (branch managers) who should see this, or just you?
+12. Our "warming" rule flags at least 3 consecutive increases totalling at least 1.0 °C (D2). Does that match what you would call "slowly warming up"? What does a normal day look like for these fridges (defrost cycles, busy hours)?
+13. Does each weekly file contain everything since the previous download, or can there be periods that are never uploaded?
