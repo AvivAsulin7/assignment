@@ -4,6 +4,7 @@ import express, { type ErrorRequestHandler } from 'express';
 import { ImportError } from '../imports/service.js';
 import { ColumnMappingError } from '../parsing/index.js';
 import type { Db } from '../persistence/db.js';
+import { fridgesRouter } from './fridges.js';
 import { uploadsRouter } from './uploads.js';
 
 export interface AppOptions {
@@ -37,6 +38,7 @@ export function createApp(db: Db, options: AppOptions = {}): express.Express {
   app.use(express.json({ limit: '5mb' }));
 
   app.use('/api', uploadsRouter(db));
+  app.use('/api', fridgesRouter(db));
 
   // Unknown API routes return JSON 404 rather than the SPA.
   app.use('/api', (_req, res) => {

@@ -93,3 +93,70 @@ export function insertReading(db: Db, r: NewReading): void {
        @rawTemperature, @temperatureC, @isValid, @invalidReason)`,
   ).run({ ...r, isValid: r.temperatureC === null ? 0 : 1 });
 }
+
+/* ---- Read queries for the fridge endpoints ---- */
+
+export interface FridgeRow {
+  id: number;
+  branch_name: string;
+  name: string;
+}
+
+/** All fridges, ordered by branch then fridge name. */
+export function listFridges(db: Db): FridgeRow[] {
+  return db
+    .prepare('SELECT id, branch_name, name FROM fridges ORDER BY branch_key, name_key, id')
+    .all() as FridgeRow[];
+}
+
+export function findFridge(db: Db, id: number): FridgeRow | undefined {
+  return db.prepare('SELECT id, branch_name, name FROM fridges WHERE id = ?').get(id) as FridgeRow | undefined;
+}
+
+export interface ImportRow {
+  id: number;
+  logger_id: string;
+  filename: string;
+  unit: 'C' | 'F';
+  imported_at: string;
+  row_count: number;
+  inserted_count: number;
+  invalid_count: number;
+  rejected_count: number;
+  duplicate_count: number;
+  conflict_count: number;
+}
+
+/** Every import recorded for a fridge (including ones that added no readings), oldest first. */
+export function listFridgeImports(db: Db, fridgeId: number): ImportRow[] {
+  return db
+    .prepare(
+      `SELECT id, logger_id, filename, unit, imported_at, row_count, inserted_count, invalid_count,
+         rejected_count, duplicate_count, conflict_count
+       FROM imports WHERE fridge_id = ? ORDER BY id`,
+    )
+    .all(fridgeId) as ImportRow[];
+}
+
+export interface ReadingRow {
+  id: number;
+  import_id: number;
+  logger_id: string;
+  source_line: number;
+  recorded_at: string;
+  raw_timestamp: string;
+  raw_temperature: string;
+  temperature_c: number | null;
+  invalid_reason: string | null;
+}
+
+/** All stored readings of a fridge, in time order. */
+export function listFridgeReadings(db: Db, fridgeId: number): ReadingRow[] {
+  return db
+    .prepare(
+      `SELECT id, import_id, logger_id, source_line, recorded_at, raw_timestamp, raw_temperature,
+         temperature_c, invalid_reason
+       FROM readings WHERE fridge_id = ? ORDER BY recorded_at, id`,
+    )
+    .all(fridgeId) as ReadingRow[];
+}
