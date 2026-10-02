@@ -16,7 +16,7 @@ Three pieces, one laptop:
 
 ```
 ┌──────────────┐   JSON / REST   ┌─────────────────────────────────────────────────┐
-│  React SPA   │ ──────────────▶ │  api/  (routes, Zod validation, response DTOs)  │
+│  React SPA   │ ──────────────▶ │  api/  (routes, request checks, response DTOs)  │
 │  (Vite, TS)  │ ◀────────────── │        │                          │             │
 └──────────────┘                 │   imports/ service          fridge queries      │
                                  │   │         │       │               │     │     │
@@ -90,7 +90,7 @@ Analysis loads the fridge's **full stored history** (all imports and loggers ass
 | **`imports/`** | Orchestrates preview and import: parse → normalise → persist. Find-or-create fridge. Duplicate/conflict detection against stored readings. Transaction boundary. Import summary. | CSV details, temperature rules, SQL text (uses repositories), HTTP. |
 | **`analysis/`** | Pure functions from one fridge's chronologically sorted readings to gaps, above-threshold runs, isolated spikes, excursions, warming findings and status. All thresholds/parameters are named constants in one place. No clock: any "now" or time window is an explicit argument. | Database, parsing, units (only ever sees °C), HTTP, React, Express. |
 | **`persistence/`** | Schema (`schema.sql`, applied at startup with `CREATE TABLE IF NOT EXISTS`), database connection, repositories with plain SQL, transactions. Enforces the unique key. | Business rules. |
-| **`api/`** | Express app factory, routes, Zod request validation, mapping domain errors to HTTP status codes, response shaping, serving the built client app. | Business logic — handlers are thin and delegate to services. |
+| **`api/`** | Express app factory, routes, minimal manual request-shape checks (`utils/validation.ts`), mapping domain errors to HTTP status codes, response shaping, serving the built client app. | Business logic — handlers are thin and delegate to services. |
 
 The Express app is created by a factory (`createApp(db)`) so integration tests can run it against an in-memory database.
 
@@ -101,11 +101,11 @@ The Express app is created by a factory (`createApp(db)`) so integration tests c
 Three pages, mobile-first, plain CSS, no state-management library (each page fetches its own data through a small `api.ts` wrapper).
 
 1. **Overview — `/`**
-   Fridges grouped by branch, problems surfaced first. Each fridge card: name, status badge, latest reading and its time, counts of findings. Tap → detail.
+   Fridges grouped by branch, problems surfaced first. Each fridge card: name, status badge, latest reading and its time — intentionally no finding counts; detailed findings belong in Fridge detail. Tap → detail.
 
 2. **Upload — `/upload`**, a single page with three steps:
    1. *Choose file* — one CSV at a time.
-   2. *Preview & confirm* — detected columns (or two dropdowns when not confident), counts, date range, sample rows. Form for Logger ID, Branch, Fridge (with suggestions from existing fridges) and a °C/°F toggle defaulting to °C. Import button.
+   2. *Preview & confirm* — detected columns (or two dropdowns when not confident), counts, date range, sample rows. Form for Logger ID, Branch, Fridge (free text) and a °C/°F toggle defaulting to °C. Import button.
    3. *Result* — import summary (including duplicates and conflicts) and a link to the fridge.
 
 3. **Fridge detail — `/fridges/:id`**
@@ -202,13 +202,31 @@ Four endpoints. No others unless implementation proves one is necessary.
 
 | Method & path | Purpose | Request | Response (outline) |
 |---|---|---|---|
-| `POST /api/uploads/preview` | Parse and validate a file without storing anything | `{ filename, content, columns? }` | `{ columns: { timestamp, temperature, confident, candidates }, counts, firstAt, lastAt, sampleRows }` |
-| `POST /api/imports` | Confirm and import | `{ filename, content, columns, loggerId, branch, fridge, unit }` | `{ importId, fridgeId, counts, conflicts }` |
-| `GET /api/fridges` | Overview | — | `[{ id, branch, name, status, latestReading, counts }]` (also used for name suggestions) |
-| `GET /api/fridges/:id` | Fridge detail with analysis | — | `{ fridge, status, readings, excursions, spikes, gaps, warming }` |
+| `POST /api/uploads/preview` | Parse and validate a file without storing anything | `{ filename, content, columns? }` | `{ headers, detection: { timestamp, temperature, confident, matches }, columns, issues, rowCount, counts, firstAt, lastAt, sampleRows }` |
+| `POST /api/imports` | Confirm and import (201) | `{ filename, content, columns, loggerId, branch, fridge, unit }` | `{ importId, fridgeId, counts, rejected, conflicts }` |
+| `GET /api/fridges` | Overview | — | `[{ id, branch, name, status, latestReading }]` |
+| `GET /api/fridges/:id` | Fridge detail with analysis | — | `{ fridge, status, statusImportId, imports: [{ …, analysis }], readings }` — see below |
 
-- Uploads are sent as JSON with the CSV content as a string (the browser reads the file). This avoids multipart middleware and lets preview and import share one Zod schema. A JSON body-size limit (a few MB) is configured; logger files are small.
-- Validation errors return `400` with Zod's messages; unknown fridge returns `404`.
+`GET /api/fridges` returns, per fridge:
+- `status`: `excursion` | `warming` | `gaps` | `ok`, or `null` when the fridge has no stored readings (the UI shows "No data").
+- `latestReading`: `{ recordedAt, temperatureC }` of the most recent stored reading, or `null`. It is the actual latest reading even when invalid (`temperatureC: null`); the API never falls back to an older valid temperature.
+
+`GET /api/fridges/:id` returns:
+```
+{ fridge: { id, branch, name },
+  status, statusImportId,                   // D3, O1, O2
+  imports: [{ id, loggerId, filename, unit, importedAt,
+              counts: { rows, inserted, invalid, rejected, duplicates, conflicts },
+              analysis: { importId, firstAt, lastAt, expectedIntervalMinutes,
+                          gaps, spikes, excursions, warming } | null }],
+  readings: [{ id, importId, loggerId, sourceLine, recordedAt,
+               rawTimestamp, rawTemperature, temperatureC, invalidReason }] }
+```
+- **Findings are nested under the import they came from**, not flattened at fridge level: each import is an independent analysis boundary (O3), so keeping findings with their import preserves their context. `analysis` is `null` for an import that added no readings.
+- All readings are returned. This is fine for the local MVP and sample data size; production would likely add a date range and/or pagination.
+
+- Uploads are sent as JSON with the CSV content as a string (the browser reads the file). This avoids multipart middleware. A JSON body-size limit (5 MB) is configured; logger files are small.
+- Malformed request shape → `400 { error: "Invalid request" }`; import/column errors → `400` with a readable message; invalid fridge id → `400`; unknown fridge → `404`; body too large → `413`; anything else → `500` without internal details.
 
 ---
 
@@ -289,10 +307,12 @@ npm workspaces with two packages.
 │  │  ├─ domain/                types, name-key helper
 │  │  ├─ parsing/
 │  │  ├─ normalization/
-│  │  ├─ analysis/              rules.ts + one file per rule
+│  │  ├─ analysis/              rules.ts (constants), analyze.ts
 │  │  ├─ imports/               import/preview service
-│  │  ├─ persistence/           schema.sql, db.ts, repositories
-│  │  ├─ api/                   createApp(), routes, Zod schemas
+│  │  ├─ fridges/               read-side service for the fridge endpoints
+│  │  ├─ persistence/           schema.ts, db.ts, repository.ts
+│  │  ├─ api/                   createApp() + error handler, uploads.ts, fridges.ts
+│  │  ├─ utils/                 request-shape checks
 │  │  └─ index.ts               starts the server
 │  ├─ scripts/
 │  │  └─ seed.ts                imports sample-data through the import service
@@ -322,7 +342,6 @@ Reviewer workflow (to be detailed in `README.md`): `npm install` → optionally 
 | **Node.js + TypeScript + Express** | Minimal, well-known HTTP layer; enough for four routes plus static files. |
 | **SQLite via better-sqlite3** | Single file, no server, no account. Mature driver; synchronous API makes transactions simple; prebuilt binaries for Windows/macOS/Linux. |
 | **PapaParse** | Correct CSV handling (quoting, BOM, CRLF, delimiter detection). Hand-rolled splitting would put bugs in the most important part of the system. |
-| **Zod** | Validates untrusted request bodies at the API boundary with readable errors. |
 | **Recharts** | Provides exactly what the detail chart needs: a threshold reference line, shaded ranges for excursions, and line breaks at gaps. |
 | **Vitest + Supertest** | TypeScript-native test runner; HTTP-level integration tests against the real Express app. |
 
@@ -335,6 +354,7 @@ Reviewer workflow (to be detailed in `README.md`): `npm install` → optionally 
 
 ### Deliberately not used
 - No ORM or migration tool — three tables, schema applied at startup.
+- No validation library — Zod was planned, then removed: a few explicit request-shape checks are enough for two POST endpoints.
 - No date library — two strict formats parsed explicitly; timestamps treated as local time, which avoids time-zone surprises.
 - No CSS framework — plain CSS is enough for three pages.
 - No client state library (Redux, React Query) — pages fetch their own data.

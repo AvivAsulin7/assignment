@@ -1,4 +1,17 @@
-// Response shapes of the upload API (server/src/imports/service.ts).
+// Response shapes of the API (server/src/imports/service.ts, server/src/fridges/service.ts).
+
+/** Current status computed by the server's analysis; null when the fridge has no readings. */
+export type FridgeStatus = 'excursion' | 'warming' | 'gaps' | 'ok';
+
+/** GET /api/fridges item. */
+export interface FridgeOverview {
+  id: number;
+  branch: string;
+  name: string;
+  status: FridgeStatus | null;
+  /** The actual latest stored reading; temperatureC is null when that reading is invalid. */
+  latestReading: { recordedAt: string; temperatureC: number | null } | null;
+}
 
 export type Unit = 'C' | 'F';
 

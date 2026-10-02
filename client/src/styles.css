@@ -190,3 +190,66 @@ table.sample td {
   border-bottom: 1px solid #e4e7eb;
   overflow-wrap: anywhere;
 }
+
+/* Overview */
+.branch h2 {
+  margin: 20px 0 8px;
+}
+
+.fridge-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.fridge-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 12px 14px;
+  min-height: 64px;
+  background: #ffffff;
+  border: 1px solid #e4e7eb;
+  border-left: 6px solid var(--status-color, #cbd2d9);
+  border-radius: 8px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.fridge-card:hover,
+.fridge-card:focus-visible {
+  border-color: #9aa5b1;
+  border-left-color: var(--status-color, #cbd2d9);
+}
+
+.fridge-name {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.latest {
+  grid-column: 1 / -1;
+  font-size: 0.9rem;
+}
+
+.badge {
+  justify-self: end;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--status-text, #3e4c59);
+  background: var(--status-bg, #e4e7eb);
+}
+
+/* Status colours: shared by card border and badge. Text labels carry the meaning too. */
+.status-excursion { --status-color: #d64545; --status-bg: #fde8e8; --status-text: #9b1c1c; }
+.status-warming { --status-color: #e8590c; --status-bg: #ffe8d9; --status-text: #a33c00; }
+.status-gaps { --status-color: #d9a400; --status-bg: #fff6d6; --status-text: #7a5b00; }
+.status-ok { --status-color: #2f9e44; --status-bg: #e3f6e8; --status-text: #1e6b2e; }
+.status-none { --status-color: #9aa5b1; --status-bg: #e4e7eb; --status-text: #3e4c59; }

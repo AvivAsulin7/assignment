@@ -78,9 +78,9 @@ At each checkpoint: Claude presents options with trade-offs → user decides →
 ## Phase 6a — REST API: upload endpoints *(done before Phase 5 for an early vertical slice)*
 
 - **Goal:** Expose preview and import over HTTP.
-- **Implement:** `POST /api/uploads/preview` and `POST /api/imports` with Zod schemas, thin handlers delegating to the import service, 400 on validation errors, JSON body-size limit.
+- **Implement:** `POST /api/uploads/preview` and `POST /api/imports` with minimal manual request-shape checks (Zod was removed), thin handlers delegating to the import service, 400 on validation errors, JSON body-size limit.
 - **Main files:** `server/src/api/{routes/uploads.ts,routes/imports.ts,schemas.ts,app.ts}`, `server/test/integration/api-uploads.test.ts`.
-- **Tests (Supertest):** preview returns detection/counts/hints; preview with explicit `columns`; import returns summary; invalid body → 400; re-upload via API → duplicates.
+- **Tests (Supertest):** preview returns detection/counts; preview with explicit `columns`; import returns summary; invalid body → 400; re-upload via API → duplicates.
 - **Done when:** Tests pass; endpoints callable from the dev frontend.
 - **Depends on:** Phase 4.
 - **Blocking decisions:** none.
@@ -88,7 +88,7 @@ At each checkpoint: Claude presents options with trade-offs → user decides →
 ## Phase 7 — Frontend upload flow
 
 - **Goal:** Summer can upload a raw CSV from her phone, preview it, enter metadata and import it.
-- **Implement:** `/upload` page with three steps: choose file → preview (detected columns or two column dropdowns, counts, date range, sample rows) + form (Logger ID, Branch, Fridge, °C/°F defaulting to °C) → result summary (inserted/invalid/rejected/duplicates/conflicts). `api.ts` fetch wrapper and `types.ts`. Mobile-first CSS. Branch/fridge suggestions are added in Phase 8 once `GET /api/fridges` exists.
+- **Implement:** `/upload` page with three steps: choose file → preview (detected columns or two column dropdowns, counts, date range, sample rows) + form (Logger ID, Branch, Fridge, °C/°F defaulting to °C) → result summary (inserted/invalid/rejected/duplicates/conflicts). `api.ts` fetch wrapper and `types.ts`. Mobile-first CSS. Branch/fridge are free-text inputs (suggestions intentionally omitted from the MVP — see Phase 8).
 - **Main files:** `client/src/pages/Upload.tsx`, `client/src/{api.ts,types.ts}`, `client/src/styles.css`.
 - **Tests:** Manual verification at phone width (≈375 px) with the sample files, including the not-confident column path and the Haifa °F file. Automated UI tests not planned (architecture §8).
 - **Done when:** Every file in `sample-data/` can be previewed and imported through the UI; the summary matches the service tests.
@@ -113,7 +113,7 @@ At each checkpoint: Claude presents options with trade-offs → user decides →
 ## Phase 6b — REST API: fridge endpoints
 
 - **Goal:** Expose overview and fridge detail with computed analysis.
-- **Implement:** `GET /api/fridges` (fridge list with status, latest reading, finding counts) and `GET /api/fridges/:id` (fridge, status, readings with raw values/logger/import, excursions, spikes, gaps, warming). Handlers load readings via repositories and call `analysis/`; 404 for unknown fridge.
+- **Implement:** `GET /api/fridges` (fridge list with status and latest reading — no finding counts) and `GET /api/fridges/:id` (fridge, status, imports each with their own findings — gaps, spikes, excursions, warming — and readings with raw values/logger/import). Handlers load readings via repositories and call `analysis/`; 404 for unknown fridge.
 - **Main files:** `server/src/api/routes/fridges.ts`, a small fridge query service, `server/test/integration/api-fridges.test.ts`.
 - **Tests (Supertest, seeded in-memory DB):** overview lists all sample fridges with expected statuses; detail for Rishon shows the excursion; detail for Tel Aviv Walk-in shows the spike and no Display 2 readings; unknown id → 404.
 - **Done when:** Tests pass.
@@ -123,7 +123,7 @@ At each checkpoint: Claude presents options with trade-offs → user decides →
 ## Phase 8 — Fridge overview
 
 - **Goal:** "See, in one place, how every fridge is doing and where something is wrong" on a phone.
-- **Implement:** `/` page: fridges grouped by branch, problems first; fridge cards with `StatusBadge`, latest reading and time, finding counts; link to detail. Add branch/fridge suggestions to the upload form from `GET /api/fridges`.
+- **Implement:** `/` page: fridges grouped by branch, problems first (display order: Above 5 °C → Warming → Data gaps → No data → OK — presentation only); fridge cards with `StatusBadge`, latest reading and time (no finding counts; an invalid latest reading is shown as unavailable); link to detail. *Branch/fridge suggestions on the upload form were planned here but are intentionally omitted from the MVP: free-text entry already satisfies the upload workflow (possible future usability improvement).*
 - **Main files:** `client/src/pages/Overview.tsx`, `client/src/components/StatusBadge.tsx`, `client/src/pages/Upload.tsx`.
 - **Tests:** Manual verification at phone and desktop widths with seeded data.
 - **Done when:** Seeded data shows the expected statuses (Rishon excursion, Tel Aviv spike not alarmed, Jerusalem gap, Haifa correct in °C).
