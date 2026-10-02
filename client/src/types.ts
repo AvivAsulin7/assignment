@@ -57,3 +57,80 @@ export interface ImportSummary {
   rejected: SkippedRow[];
   conflicts: SkippedRow[];
 }
+
+// GET /api/fridges/:id — findings come from the server's analysis (server/src/analysis/analyze.ts).
+
+export interface Gap {
+  startAt: string;
+  endAt: string;
+  minutes: number;
+  readingIds: [number, number];
+}
+
+export interface Spike {
+  readingId: number;
+  at: string;
+  temperatureC: number;
+}
+
+export interface Excursion {
+  startAt: string;
+  /** Null while still above 5 °C at the end of its import. */
+  endAt: string | null;
+  /** When ongoing: "at least" this long. */
+  minutes: number;
+  ongoing: boolean;
+  containsMissingData: boolean;
+  peakC: number;
+  readingIds: number[];
+}
+
+export interface Warming {
+  startAt: string;
+  endAt: string;
+  fromC: number;
+  toC: number;
+  riseC: number;
+  readingIds: number[];
+}
+
+export interface ImportAnalysis {
+  importId: number;
+  firstAt: string;
+  lastAt: string;
+  expectedIntervalMinutes: number | null;
+  gaps: Gap[];
+  spikes: Spike[];
+  excursions: Excursion[];
+  warming: Warming[];
+}
+
+export interface FridgeDetail {
+  fridge: { id: number; branch: string; name: string };
+  status: FridgeStatus | null;
+  statusImportId: number | null;
+  /** Oldest first; findings stay with the import they came from. */
+  imports: {
+    id: number;
+    loggerId: string;
+    filename: string;
+    unit: Unit;
+    importedAt: string;
+    counts: ImportSummary['counts'];
+    /** Null when the import added no readings. */
+    analysis: ImportAnalysis | null;
+  }[];
+  /** All stored readings, oldest first. */
+  readings: {
+    id: number;
+    importId: number;
+    loggerId: string;
+    sourceLine: number;
+    recordedAt: string;
+    rawTimestamp: string;
+    rawTemperature: string;
+    /** Null when the reading is invalid (e.g. ERR). */
+    temperatureC: number | null;
+    invalidReason: string | null;
+  }[];
+}

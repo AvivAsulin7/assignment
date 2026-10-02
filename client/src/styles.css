@@ -253,3 +253,103 @@ table.sample td {
 .status-gaps { --status-color: #d9a400; --status-bg: #fff6d6; --status-text: #7a5b00; }
 .status-ok { --status-color: #2f9e44; --status-bg: #e3f6e8; --status-text: #1e6b2e; }
 .status-none { --status-color: #9aa5b1; --status-bg: #e4e7eb; --status-text: #3e4c59; }
+
+/* Fridge detail */
+.back {
+  display: inline-block;
+  margin-bottom: 12px;
+  padding: 6px 0;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.detail-header h1 {
+  overflow-wrap: anywhere;
+}
+
+.branch-name {
+  margin: 0;
+}
+
+h3 {
+  font-size: 1rem;
+  margin: 0 0 4px;
+  overflow-wrap: anywhere;
+}
+
+.small {
+  font-size: 0.85rem;
+}
+
+.chart {
+  width: 100%;
+  margin: 8px 0;
+}
+
+.tag {
+  display: inline-block;
+  margin: 4px 0;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #e8f0fe;
+  color: #1d4ed8;
+  font-size: 0.85rem;
+}
+
+.ok-text {
+  color: #1e6b2e;
+}
+
+.findings {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: grid;
+  gap: 8px;
+}
+
+.finding {
+  padding: 8px 10px;
+  border-left: 4px solid var(--status-color);
+  background: var(--status-bg);
+  border-radius: 4px;
+}
+
+.finding .note {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.9rem;
+}
+
+details.card summary {
+  cursor: pointer;
+  font-weight: 600;
+  min-height: 32px;
+}
+
+.reading-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+}
+
+.reading-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid #e4e7eb;
+}
+
+.invalid {
+  color: #9b1c1c;
+  font-weight: 600;
+}

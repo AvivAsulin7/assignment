@@ -1,5 +1,15 @@
+/** Error with a message that can be shown to the user, plus the HTTP status (0 = no response). */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
 /**
- * Small fetch helpers. Both throw an Error whose message can be shown to the
+ * Small fetch helpers. Both throw an ApiError whose message can be shown to the
  * user (the API's `error` text when there is one).
  */
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
@@ -7,12 +17,12 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   try {
     res = await fetch(url, init);
   } catch {
-    throw new Error('Could not reach the server. Check your connection and try again.');
+    throw new ApiError('Could not reach the server. Check your connection and try again.', 0);
   }
 
   const data = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new Error(data?.error ?? `Request failed (${res.status}).`);
+    throw new ApiError(data?.error ?? `Request failed (${res.status}).`, res.status);
   }
   return data as T;
 }
