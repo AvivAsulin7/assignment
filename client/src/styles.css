@@ -41,3 +41,152 @@ h1 {
   font-size: 1.4rem;
   margin: 0 0 12px;
 }
+
+h2 {
+  font-size: 1.1rem;
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
+
+/* Upload page */
+.card {
+  background: #ffffff;
+  border: 1px solid #e4e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+label,
+legend {
+  display: block;
+  font-weight: 600;
+  margin: 12px 0 4px;
+}
+
+input:not([type='radio']),
+select,
+button {
+  width: 100%;
+  min-height: 44px; /* comfortable tap target */
+  font: inherit;
+}
+
+input:not([type='radio']):not([type='file']),
+select {
+  padding: 8px 10px;
+  border: 1px solid #cbd2d9;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+label.choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: normal;
+  margin: 4px 0;
+  min-height: 44px;
+}
+
+button {
+  margin-top: 16px;
+  border: 0;
+  border-radius: 6px;
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:disabled {
+  background: #9aa5b1;
+  cursor: default;
+}
+
+.muted {
+  color: #616e7c;
+}
+
+.error {
+  background: #fde8e8;
+  color: #9b1c1c;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.warning {
+  background: #fff8e1;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-top: 12px;
+  overflow-wrap: anywhere;
+}
+
+.warning p,
+.warning ul {
+  margin: 4px 0;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  margin: 8px 0;
+}
+
+.facts dt {
+  color: #616e7c;
+}
+
+.facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.counts {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.counts li {
+  background: #f5f7fa;
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.counts strong {
+  display: block;
+  font-size: 1.2rem;
+}
+
+table.sample {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  margin-top: 12px;
+}
+
+table.sample caption {
+  text-align: left;
+  color: #616e7c;
+  margin-bottom: 4px;
+}
+
+table.sample th,
+table.sample td {
+  text-align: left;
+  padding: 6px 4px;
+  border-bottom: 1px solid #e4e7eb;
+  overflow-wrap: anywhere;
+}
