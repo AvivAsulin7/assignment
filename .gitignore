@@ -19,7 +19,13 @@ coverage/
 Thumbs.db
 .vscode/
 .idea/
-NOTES.md
+
+# Private detailed engineering log (not part of the submission)
+NOTES2.md
+
+# Logs
+*.log
+npm-debug.log*
 
 # Personal Claude Code settings
 .claude/settings.local.json
